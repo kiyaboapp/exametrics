@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+env/
+venv/
+ENV/
+.venv/
+.ENV/
+
+# VS Code
+.vscode/
+
+# Pytest and coverage
+.cache/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Logs and local files
+*.log
+*.sqlite3
+*.db
+instance/
+*.pid
+
+# Environment/config files
+.env
+.env.*
+secrets.json
+config.ini
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uvicorn/PID
+*.pid
+
+# MyPy, Pylint, etc.
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Pydantic cache
+__pydantic__/ 

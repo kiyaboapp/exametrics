@@ -1,0 +1,79 @@
+exametrics/
+├── alembic/
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+├── app/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── deps.py
+│   │   └── v1/
+│   │       ├── __init__.py  # Aggregates all v1 routers
+│   │       ├── auth.py
+│   │       ├── exams.py
+│   │       ├── results.py
+│   │       ├── schools.py
+│   │       ├── students.py
+│   │       └── student_subjects.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── security.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── database.py
+│   │   └── models/
+│   │       ├── __init__.py
+│   │       ├── region.py
+│   │       ├── council.py
+│   │       ├── ward.py
+│   │       ├── school.py
+│   │       ├── user.py
+│   │       ├── examination_board.py
+│   │       ├── exam.py
+│   │       ├── exam_division.py
+│   │       ├── exam_grade.py
+│   │       ├── subject.py
+│   │       ├── exam_subject.py
+│   │       ├── student.py
+│   │       ├── result.py
+│   │       └── student_subject.py
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── region.py
+│   │   ├── council.py
+│   │   ├── ward.py
+│   │   ├── school.py
+│   │   ├── user.py
+│   │   ├── examination_board.py
+│   │   ├── exam.py
+│   │   ├── exam_division.py
+│   │   ├── exam_grade.py
+│   │   ├── subject.py
+│   │   ├── exam_subject.py
+│   │   ├── student.py
+│   │   ├── result.py
+│   │   └── student_subject.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_service.py
+│   │   ├── exam_service.py
+│   │   ├── result_service.py
+│   │   ├── school_service.py
+│   │   └── student_service.py
+│   └── main.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_auth.py
+│   ├── test_exams.py
+│   ├── test_results.py
+│   ├── test_schools.py
+│   └── test_students.py
+├── .env
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── alembic.ini
+└── docker-compose.yml
