@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import auth, exams, results, schools, students, student_subjects
+from app.api.v1 import auth, exams, results, schools, students, student_subjects, exam_divisions, exam_grades
 from app.core.config import settings
 from app.db.database import init_db
 
@@ -26,6 +26,8 @@ app.include_router(results.router, prefix="/api/v1/results", tags=["Results"])
 app.include_router(schools.router, prefix="/api/v1/schools", tags=["Schools"])
 app.include_router(students.router, prefix="/api/v1/students", tags=["Students"])
 app.include_router(student_subjects.router, prefix="/api/v1/student-subjects", tags=["Student Subjects"])
+app.include_router(exam_divisions.router, prefix="/api/v1/exam-divisions", tags=["Exam Divisions"])
+app.include_router(exam_grades.router, prefix="/api/v1/exam-grades", tags=["Exam Grades"])
 
 @app.on_event("startup")
 async def startup_event():

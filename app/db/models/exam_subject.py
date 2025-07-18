@@ -8,7 +8,7 @@ class ExamSubject(Base):
     exam_id = Column(String(36), ForeignKey("exams.exam_id", ondelete="CASCADE"), primary_key=True)
     subject_code = Column(String(10), ForeignKey("subjects.subject_code"), primary_key=True)
     subject_name = Column(String(50), nullable=False)
-    subject_short = Column(String(20), nullable=False)
+    subject_short = Column(String(50), nullable=False)
     is_present = Column(Boolean, nullable=False, default=False)
     has_practical = Column(Boolean, nullable=False, default=False)
     display_name = Column(
