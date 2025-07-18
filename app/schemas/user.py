@@ -19,7 +19,7 @@ class UserBase(BaseModel):
     first_name: str
     middle_name: Optional[str] = None
     surname: str
-    school_name: Optional[str] = None
+    # school_name: Optional[str] = None
     centre_number: Optional[str] = None
     role: UserRole = UserRole.USER
 
@@ -30,7 +30,7 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     middle_name: Optional[str] = None
     surname: Optional[str] = None
-    school_name: Optional[str] = None
+    # school_name: Optional[str] = None
     centre_number: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None

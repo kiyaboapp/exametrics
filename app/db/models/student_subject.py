@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, ForeignKey
+from sqlalchemy import Column, ForeignKeyConstraint, String, Float, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -6,8 +6,16 @@ class StudentSubject(Base):
     __tablename__ = "student_subjects"
 
     exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
-    student_id = Column(String(20), primary_key=True)
+    student_id = Column(String(20), ForeignKey("students.student_id"), primary_key=True)  # Added ForeignKey
     subject_code = Column(String(10), primary_key=True)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["exam_id", "subject_code"],
+            ["exam_subjects.exam_id", "exam_subjects.subject_code"],
+            ondelete="CASCADE"
+        ),
+    )
+
     theory_marks = Column(Float)
     practical_marks = Column(Float)
     overall_marks = Column(Float)

@@ -6,7 +6,7 @@ class Result(Base):
     __tablename__ = "results"
 
     exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
-    student_id = Column(String(20), primary_key=True)
+    student_id = Column(String(20), ForeignKey("students.student_id"), primary_key=True)  # Added ForeignKey
     avg_marks = Column(Float)
     total_marks = Column(Float)
     division = Column(String(3))

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import text
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -23,8 +23,6 @@ class User(Base):
     first_name = Column(String(255), nullable=False)
     middle_name = Column(String(255))
     surname = Column(String(255), nullable=False)
-    school_name = Column(String(255))
-    centre_number = Column(String(255))
     role = Column(Enum(Role), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
@@ -38,6 +36,9 @@ class User(Base):
     google_id = Column(String(255), unique=True)
     is_google_account = Column(Boolean, default=False)
     last_login = Column(DateTime)
+
+    # Foreign key to School
+    centre_number = Column(String(10), ForeignKey("schools.centre_number", ondelete="SET NULL"))
 
     # Relationships
     school = relationship("School", back_populates="users")

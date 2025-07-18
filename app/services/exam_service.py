@@ -1,18 +1,19 @@
-# app/services/exam_service.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import Depends, HTTPException, status
 from app.db.models.exam import Exam, ExamLevel
-
 from app.db.models.exam_division import ExamDivision
 from app.db.models.exam_grade import ExamGrade
 from app.schemas.exam import ExamCreate, ExamInDB
 from app.schemas.exam_division import ExamDivisionCreate
 from app.schemas.exam_grade import ExamGradeCreate
 from app.db.database import get_db
+from uuid6 import uuid6  # Added import for UUIDv6
 
 async def create_exam(db: AsyncSession, exam: ExamCreate) -> ExamInDB:
-    db_exam = Exam(**exam.dict())
+    exam_data = exam.dict()
+    exam_data["exam_id"] = str(uuid6())  # Explicitly set exam_id
+    db_exam = Exam(**exam_data)
     db.add(db_exam)
     await db.commit()
     await db.refresh(db_exam)

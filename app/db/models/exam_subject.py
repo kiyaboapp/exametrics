@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey,Computed
+from sqlalchemy import Column, String, Boolean, ForeignKey, Computed
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -20,4 +20,8 @@ class ExamSubject(Base):
     # Relationships
     exam = relationship("Exam", back_populates="subjects")
     subject = relationship("Subject", back_populates="exam_subjects")
-    student_subjects = relationship("StudentSubject", back_populates="exam_subject")
+    student_subjects = relationship(
+        "StudentSubject",
+        back_populates="exam_subject",
+        overlaps="student_subjects"  # Added to silence SAWarning
+    )
