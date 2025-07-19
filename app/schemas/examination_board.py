@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
+from pydantic import ConfigDict
 
 class ExamBoardBase(BaseModel):
     name: str
@@ -10,8 +12,6 @@ class ExamBoardBase(BaseModel):
 class ExamBoardCreate(ExamBoardBase):
     pass
 
-class ExamBoardInDB(ExamBoardBase):
-    board_id: str
-
-    class Config:
-        from_attributes = True
+class ExamBoard(ExamBoardBase):
+    board_id: UUID
+    model_config = ConfigDict(from_attributes=True)

@@ -3,6 +3,7 @@ from sqlalchemy.sql import text
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 import enum
+from uuid6 import uuid6
 
 class Role(str, enum.Enum):
     USER = "USER"
@@ -17,7 +18,7 @@ class Role(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     first_name = Column(String(255), nullable=False)

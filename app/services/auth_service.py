@@ -1,33 +1,36 @@
+# app/services/auth_service.py
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import Depends, HTTPException, status
+from fastapi import HTTPException, status
 from datetime import datetime
-from app.db.models.user import User
+from app.db.models import User, School
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.schemas.user import UserCreate, UserInDB
-from app.db.database import get_db
+from app.schemas.user import UserCreate, User
+import uuid6
 
-async def create_user(db: AsyncSession, user: UserCreate) -> UserInDB:
+async def create_user(db: AsyncSession, user: UserCreate) -> User:
+    # Check for existing user
     result = await db.execute(select(User).filter(User.username == user.username))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="Username already registered")
-    hashed_password = get_password_hash(user.password)
-    db_user = User(
-        username=user.username,
-        email=user.email,
-        first_name=user.first_name,
-        middle_name=user.middle_name,
-        surname=user.surname,
-        centre_number=user.centre_number,
-        role=user.role,
-        hashed_password=hashed_password
-    )
+    
+    # Validate centre_number
+    if user.centre_number:
+        school_exists = await db.execute(select(School).filter(School.centre_number == user.centre_number))
+        if not school_exists.scalars().first():
+            raise HTTPException(status_code=400, detail="School with provided centre_number does not exist")
+
+    user_data = user.dict(exclude={"password"})
+    user_data["hashed_password"] = get_password_hash(user.password)
+    user_data["id"] = str(uuid6())
+    db_user = User(**user_data)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-    return UserInDB.from_orm(db_user)
+    return User.from_orm(db_user)
 
-async def authenticate_user(db: AsyncSession, username: str, password: str) -> UserInDB:
+async def authenticate_user(db: AsyncSession, username: str, password: str) -> User:
     result = await db.execute(select(User).filter(User.username == username))
     user = result.scalars().first()
     if not user or not verify_password(password, user.hashed_password):
@@ -38,4 +41,4 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
         )
     user.last_login = datetime.utcnow()
     await db.commit()
-    return UserInDB.from_orm(user)
+    return User.from_orm(user)

@@ -1,9 +1,13 @@
 from pydantic import BaseModel
+from uuid import UUID
 from typing import Optional
+from datetime import datetime
+from pydantic import ConfigDict
 
 class ResultBase(BaseModel):
-    exam_id: str
-    student_id: str
+    exam_id: UUID
+    student_global_id: UUID
+    centre_number: str
     avg_marks: Optional[float] = None
     total_marks: Optional[float] = None
     division: Optional[str] = None
@@ -36,6 +40,7 @@ class ResultBase(BaseModel):
 class ResultCreate(ResultBase):
     pass
 
-class ResultInDB(ResultBase):
-    class Config:
-        from_attributes = True
+class Result(ResultBase):
+    id: UUID
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

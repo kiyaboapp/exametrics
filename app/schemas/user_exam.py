@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from enum import Enum
+from pydantic import ConfigDict
 
 class UserExamRole(str, Enum):
     VIEWER = "VIEWER"
@@ -15,5 +16,7 @@ class UserExamCreate(UserExamBase):
     pass
 
 class UserExamInDB(UserExamBase):
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class UserExam(UserExamInDB):
+    pass

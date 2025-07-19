@@ -1,14 +1,15 @@
+# app/api/v1/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.schemas.user import UserCreate, UserInDB
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.database import get_db
+from app.schemas.user import UserCreate, User
 from app.services.auth_service import create_user, authenticate_user
 from app.core.security import create_access_token
-from app.db.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserInDB)
+@router.post("/register", response_model=User)
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return await create_user(db, user)
 

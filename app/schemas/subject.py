@@ -1,19 +1,15 @@
 from pydantic import BaseModel
-from typing import Optional
+from pydantic import ConfigDict
 
 class SubjectBase(BaseModel):
-    subject_code: str
     subject_name: str
     subject_short: str
-    is_present: bool = False
     has_practical: bool = False
     exclude_from_gpa: bool = False
 
 class SubjectCreate(SubjectBase):
-    pass
+    subject_code: str
 
-class SubjectInDB(SubjectBase):
-    display_name: str
-
-    class Config:
-        from_attributes = True
+class Subject(SubjectBase):
+    subject_code: str
+    model_config = ConfigDict(from_attributes=True)

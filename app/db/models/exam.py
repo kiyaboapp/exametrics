@@ -1,40 +1,38 @@
-from sqlalchemy import Column, String, Date, Enum, JSON, ForeignKey
+from sqlalchemy import Column, String, Date, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.database import Base
+from uuid6 import uuid6
 import enum
-from uuid6 import uuid6  # Added import for UUIDv6 generation
 
 class AvgStyle(str, enum.Enum):
-    AUTO = "auto"
-    SEVEN_BEST = "seven_best"
-    EIGHT_BEST = "eight_best"
+    AUTO = "AUTO"
+    SEVEN_BEST = "SEVEN_BEST"
+    EIGHT_BEST = "EIGHT_BEST"
 
 class ExamLevel(str, enum.Enum):
-    STNA = "stna"
-    SFNA = "sfna"
-    PSLE = "psle"
-    FTNA = "ftna"
-    CSEE = "csee"
-    ACSEE = "acsee"
+    STNA = "STNA"
+    SFNA = "SFNA"
+    PSLE = "PSLE"
+    FTNA = "FTNA"
+    CSEE = "CSEE"
+    ACSEE = "ACSEE"
 
 class Exam(Base):
     __tablename__ = "exams"
-
-    exam_id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))  # Changed to UUIDv6
-    board_id = Column(String(36), ForeignKey("exam_boards.board_id"), nullable=False)
+    exam_id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))
+    board_id = Column(String(36), ForeignKey("exam_boards.board_id", onupdate="CASCADE"), nullable=False)
     exam_name = Column(String(100), nullable=False)
     exam_name_swahili = Column(String(100))
-    start_date = Column(Date, nullable=False, index=True)
+    start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    avg_style = Column(Enum(AvgStyle), nullable=False, default=AvgStyle.AUTO)
-    calculation_rules = Column(JSON)
+    avg_style = Column(Enum(AvgStyle), nullable=False)
     exam_level = Column(Enum(ExamLevel), nullable=False)
-
+    
     # Relationships
     board = relationship("ExamBoard", back_populates="exams")
-    divisions = relationship("ExamDivision", back_populates="exam")
-    grades = relationship("ExamGrade", back_populates="exam")
-    subjects = relationship("ExamSubject", back_populates="exam")
+    students = relationship("Student", back_populates="exam")
     results = relationship("Result", back_populates="exam")
-    student_subjects = relationship("StudentSubject", back_populates="exam")
+    exam_subjects = relationship("ExamSubject", back_populates="exam")
+    exam_divisions = relationship("ExamDivision", back_populates="exam")
+    exam_grades = relationship("ExamGrade", back_populates="exam")
     user_exams = relationship("UserExam", back_populates="exam")

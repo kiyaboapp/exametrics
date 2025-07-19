@@ -1,7 +1,9 @@
 from pydantic import BaseModel
+from uuid import UUID
+from pydantic import ConfigDict
 
 class ExamDivisionBase(BaseModel):
-    exam_id: str
+    exam_id: UUID
     division: str
     lowest_points: int
     highest_points: int
@@ -9,6 +11,7 @@ class ExamDivisionBase(BaseModel):
 class ExamDivisionCreate(ExamDivisionBase):
     pass
 
-class ExamDivisionInDB(ExamDivisionBase):
-    class Config:
-        from_attributes = True
+class ExamDivision(ExamDivisionBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)

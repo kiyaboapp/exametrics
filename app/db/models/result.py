@@ -1,12 +1,14 @@
-from sqlalchemy import Column, String, Float, Integer, ForeignKey
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime, Index, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from app.db.database import Base
+from uuid6 import uuid6
 
 class Result(Base):
     __tablename__ = "results"
-
-    exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
-    student_id = Column(String(20), ForeignKey("students.student_id"), primary_key=True)  # Added ForeignKey
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))
+    exam_id = Column(String(36), ForeignKey("exams.exam_id", ondelete="CASCADE"))
+    student_global_id = Column(String(36), ForeignKey("students.student_global_id", ondelete="CASCADE"))
+    centre_number = Column(String(10), ForeignKey("schools.centre_number", ondelete="CASCADE"))
     avg_marks = Column(Float)
     total_marks = Column(Float)
     division = Column(String(3))
@@ -35,7 +37,15 @@ class Result(Base):
     fifth_marks = Column(Float)
     sixth_marks = Column(Float)
     seventh_marks = Column(Float)
-
+    created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
+    
     # Relationships
-    exam = relationship("Exam", back_populates="results")
     student = relationship("Student", back_populates="results")
+    exam = relationship("Exam", back_populates="results")
+    
+    __table_args__ = (
+        UniqueConstraint('exam_id', 'student_global_id', 'centre_number'),
+        Index('idx_result_exam_id', 'exam_id'),
+        Index('idx_result_student_global_id', 'student_global_id'),
+        Index('idx_result_centre_number', 'centre_number'),
+    )

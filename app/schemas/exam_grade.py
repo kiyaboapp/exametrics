@@ -1,7 +1,9 @@
 from pydantic import BaseModel
+from uuid import UUID
+from pydantic import ConfigDict
 
 class ExamGradeBase(BaseModel):
-    exam_id: str
+    exam_id: UUID
     grade: str
     lower_value: float
     highest_value: float
@@ -11,6 +13,6 @@ class ExamGradeBase(BaseModel):
 class ExamGradeCreate(ExamGradeBase):
     pass
 
-class ExamGradeInDB(ExamGradeBase):
-    class Config:
-        from_attributes = True
+class ExamGrade(ExamGradeBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)

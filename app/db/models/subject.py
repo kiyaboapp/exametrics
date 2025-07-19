@@ -8,7 +8,7 @@ class Subject(Base):
     subject_code = Column(String(10), primary_key=True)
     subject_name = Column(String(50), nullable=False)
     subject_short = Column(String(50), nullable=False)
-    has_practical = Column(Boolean, nullable=False)
+    has_practical = Column(Boolean, nullable=False,default=False)
     exclude_from_gpa=Column(Boolean,default=False)
 
     # Relationships

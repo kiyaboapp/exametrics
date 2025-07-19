@@ -1,29 +1,22 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date, datetime
-from enum import Enum
-
-class Sex(str, Enum):
-    MALE = "M"
-    FEMALE = "F"
-    OTHER = "Other"
+from uuid import UUID
+from app.db.models.student import Sex
+from pydantic import ConfigDict
 
 class StudentBase(BaseModel):
     student_id: str
+    centre_number: str
     first_name: str
     middle_name: Optional[str] = None
     surname: str
     sex: Sex
-    centre_number: str
-    date_of_birth: Optional[date] = None
+    exam_id: UUID
 
 class StudentCreate(StudentBase):
-    pass
+    student_global_id:Optional[UUID]
 
-class StudentInDB(StudentBase):
-    student_global_id: str
+class Student(StudentBase):
+    student_global_id: UUID
     full_name: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

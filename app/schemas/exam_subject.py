@@ -1,20 +1,21 @@
 from pydantic import BaseModel
+from uuid import UUID
 from typing import Optional
+from pydantic import ConfigDict
 
 class ExamSubjectBase(BaseModel):
-    exam_id: str
+    exam_id: UUID
     subject_code: str
     subject_name: str
     subject_short: str
-    is_present: bool = False
-    has_practical: bool = False
-    exclude_from_gpa: bool = False
+    is_present: Optional[bool] = None
+    has_practical: bool
+    exclude_from_gpa: bool
 
 class ExamSubjectCreate(ExamSubjectBase):
     pass
 
-class ExamSubjectInDB(ExamSubjectBase):
+class ExamSubject(ExamSubjectBase):
+    id: int
     display_name: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
