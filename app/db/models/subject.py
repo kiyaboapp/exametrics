@@ -9,6 +9,7 @@ class Subject(Base):
     subject_name = Column(String(50), nullable=False)
     subject_short = Column(String(50), nullable=False)
     has_practical = Column(Boolean, nullable=False)
+    exclude_from_gpa=Column(Boolean,default=False)
 
     # Relationships
     exam_subjects = relationship("ExamSubject", back_populates="subject")

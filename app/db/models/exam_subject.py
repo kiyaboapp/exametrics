@@ -25,3 +25,4 @@ class ExamSubject(Base):
         back_populates="exam_subject",
         overlaps="student_subjects"  # Added to silence SAWarning
     )
+    exclude_from_gpa=Column(Boolean, nullable=False, default=False)

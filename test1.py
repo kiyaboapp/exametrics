@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import os
 from dotenv import load_dotenv
 from utils.pdf.pdf_processor import PDFTableProcessor
-import asyncio
+from app.db.database import get_db, init_db  # Import get_db and init_db
+from utils.excel.excel import export_to_excel  # Adjust path as needed
 
 # Load environment variables from .env file
 if not os.path.exists('.env'):
@@ -17,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def main():
-    exam_id = "00eb6d05-6173-11f0-b610-80b655697afc"
+    exam_id = "1f063d43-67bc-6c3a-a294-69a24a3c35ac"
     files = [
         r"C:\Users\droge\OneDrive\Documents\NASCO F4 PRINT OUT.pdf",
         r"C:\Users\droge\OneDrive\Documents\FAMGI F4 PRINT OUT.pdf",
@@ -67,9 +69,29 @@ async def main():
             print(f"Error processing PDF {pdf_path}: {str(e)}")
             continue
 
+async def hahaha():
+    from utils.excel.excel import export_to_excel
+    exam_id = "1f063d43-67bc-6c3a-a294-69a24a3c35ac"
+    async for session in get_db():  # Iterate the async generator
+        try:
+            mama = await export_to_excel(
+                exam_id=exam_id,
+                # session=session,  # Pass the session
+                # ward_name="Downtown Ward",
+                # council_name="City Council",
+                # region_name="North Region",
+                # school_type="government",
+                # practical_mode=0
+            )
+            print(f"Excel file saved at: {mama}")
+        except Exception as e:
+            logger.error(f"Error in export_to_excel: {str(e)}")
+            print(f"Error in export_to_excel: {str(e)}")
+            raise
+
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        asyncio.run(hahaha())
     except Exception as e:
         logger.error(f"Event loop error: {str(e)}")
         print(f"Error: {str(e)}")

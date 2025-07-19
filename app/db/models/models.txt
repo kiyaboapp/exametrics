@@ -1,0 +1,401 @@
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class Council(Base):
+    __tablename__ = "councils"
+
+    council_id = Column(Integer, primary_key=True, autoincrement=True)
+    council_name = Column(String(50), unique=True, nullable=False)
+    region_id = Column(Integer, ForeignKey("regions.region_id", onupdate="CASCADE"), nullable=False)
+
+    # Relationships
+    region = relationship("Region", back_populates="councils")
+    wards = relationship("Ward", back_populates="council")
+    schools = relationship("School", back_populates="council")
+
+
+from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class ExamDivision(Base):
+    __tablename__ = "exam_divisions"
+
+    exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
+    division = Column(String(3), primary_key=True)
+    lowest_points = Column(Integer, nullable=False)
+    highest_points = Column(Integer, nullable=False)
+
+    # Relationship
+    exam = relationship("Exam", back_populates="divisions")
+
+from sqlalchemy import Column, String
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class ExamBoard(Base):
+    __tablename__ = "exam_boards"
+
+    board_id = Column(String(36), primary_key=True, default="uuid()")
+    name = Column(String(100), nullable=False)
+    location = Column(String(100))
+    chairman = Column(String(100))
+    secretary = Column(String(100))
+
+    # Relationship
+    exams = relationship("Exam", back_populates="board")
+
+from sqlalchemy import Column, String, Date, Enum, JSON, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+import enum
+from uuid6 import uuid6  # Added import for UUIDv6 generation
+
+class AvgStyle(str, enum.Enum):
+    AUTO = "auto"
+    SEVEN_BEST = "seven_best"
+    EIGHT_BEST = "eight_best"
+
+class ExamLevel(str, enum.Enum):
+    STNA = "stna"
+    SFNA = "sfna"
+    PSLE = "psle"
+    FTNA = "ftna"
+    CSEE = "csee"
+    ACSEE = "acsee"
+
+class Exam(Base):
+    __tablename__ = "exams"
+
+    exam_id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))  # Changed to UUIDv6
+    board_id = Column(String(36), ForeignKey("exam_boards.board_id"), nullable=False)
+    exam_name = Column(String(100), nullable=False)
+    exam_name_swahili = Column(String(100))
+    start_date = Column(Date, nullable=False, index=True)
+    end_date = Column(Date, nullable=False)
+    avg_style = Column(Enum(AvgStyle), nullable=False, default=AvgStyle.AUTO)
+    calculation_rules = Column(JSON)
+    exam_level = Column(Enum(ExamLevel), nullable=False)
+
+    # Relationships
+    board = relationship("ExamBoard", back_populates="exams")
+    divisions = relationship("ExamDivision", back_populates="exam")
+    grades = relationship("ExamGrade", back_populates="exam")
+    subjects = relationship("ExamSubject", back_populates="exam")
+    results = relationship("Result", back_populates="exam")
+    student_subjects = relationship("StudentSubject", back_populates="exam")
+    user_exams = relationship("UserExam", back_populates="exam")
+
+from sqlalchemy import Column, String, Boolean, ForeignKey, Computed
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class ExamSubject(Base):
+    __tablename__ = "exam_subjects"
+
+    exam_id = Column(String(36), ForeignKey("exams.exam_id", ondelete="CASCADE"), primary_key=True)
+    subject_code = Column(String(10), ForeignKey("subjects.subject_code"), primary_key=True)
+    subject_name = Column(String(50), nullable=False)
+    subject_short = Column(String(50), nullable=False)
+    is_present = Column(Boolean, nullable=False, default=False)
+    has_practical = Column(Boolean, nullable=False, default=False)
+    display_name = Column(
+        String(30),
+        Computed("CONCAT(subject_code, '-', subject_short)", persisted=True)
+    )
+    exclude_from_gpa = Column(Boolean, nullable=False, default=False)
+
+    # Relationships
+    exam = relationship("Exam", back_populates="subjects")
+    subject = relationship("Subject", back_populates="exam_subjects")
+    student_subjects = relationship(
+        "StudentSubject",
+        back_populates="exam_subject",
+        overlaps="student_subjects"  # Added to silence SAWarning
+    )
+    exclude_from_gpa=Column(Boolean, nullable=False, default=False)
+
+from sqlalchemy import Column, String, Float, Integer, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class ExamGrade(Base):
+    __tablename__ = "exam_grades"
+
+    exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
+    grade = Column(String(2), primary_key=True)
+    lower_value = Column(Float, nullable=False)
+    highest_value = Column(Float, nullable=False)
+    grade_points = Column(Float, nullable=False)
+    division_points = Column(Integer, nullable=False)
+
+    # Relationship
+    exam = relationship("Exam", back_populates="grades")
+
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class Ward(Base):
+    __tablename__ = "wards"
+
+    ward_id = Column(Integer, primary_key=True)
+    ward_name = Column(String(100), nullable=False)
+    council_id = Column(Integer, ForeignKey("councils.council_id", onupdate="CASCADE"), nullable=False)
+
+    # Relationships
+    council = relationship("Council", back_populates="wards")
+    schools = relationship("School", back_populates="ward")
+
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class Region(Base):
+    __tablename__ = "regions"
+
+    region_id = Column(Integer, primary_key=True, autoincrement=True)
+    region_name = Column(String(50), unique=True, nullable=False)
+
+    # Relationships
+    councils = relationship("Council", back_populates="region")
+    schools = relationship("School", back_populates="region")
+
+from sqlalchemy import Column, String, Float, Integer, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class Result(Base):
+    __tablename__ = "results"
+
+    exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
+    student_id = Column(String(20), ForeignKey("students.student_id"), primary_key=True)  # Added ForeignKey
+    avg_marks = Column(Float)
+    total_marks = Column(Float)
+    division = Column(String(3))
+    total_points = Column(Integer)
+    pos = Column(Integer)
+    out_of = Column(Integer)
+    ward_pos = Column(Integer)
+    ward_out_of = Column(Integer)
+    council_pos = Column(Integer)
+    council_out_of = Column(Integer)
+    region_pos = Column(Integer)
+    region_out_of = Column(Integer)
+    ward_pos_gvt = Column(Integer)
+    ward_pos_pvt = Column(Integer)
+    ward_pos_unknown = Column(Integer)
+    council_pos_gvt = Column(Integer)
+    council_pos_pvt = Column(Integer)
+    council_pos_unknown = Column(Integer)
+    region_pos_gvt = Column(Integer)
+    region_pos_pvt = Column(Integer)
+    region_pos_unknown = Column(Integer)
+    first_marks = Column(Float)
+    second_marks = Column(Float)
+    third_marks = Column(Float)
+    fourth_marks = Column(Float)
+    fifth_marks = Column(Float)
+    sixth_marks = Column(Float)
+    seventh_marks = Column(Float)
+
+    # Relationships
+    exam = relationship("Exam", back_populates="results")
+    student = relationship("Student", back_populates="results")
+
+from sqlalchemy import Column, String, Integer, Enum, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+import enum
+
+class SchoolType(str, enum.Enum):
+    GOVERNMENT = "government"
+    PRIVATE = "private"
+    UNKNOWN = "unknown"
+
+class School(Base):
+    __tablename__ = "schools"
+
+    centre_number = Column(String(10), primary_key=True)
+    school_name = Column(String(100), nullable=False)
+    region_id = Column(Integer, ForeignKey("regions.region_id", ondelete="SET NULL", onupdate="CASCADE"))
+    council_id = Column(Integer, ForeignKey("councils.council_id", ondelete="SET NULL", onupdate="CASCADE"))
+    ward_id = Column(Integer, ForeignKey("wards.ward_id", ondelete="SET NULL", onupdate="CASCADE"))
+    school_type = Column(Enum(SchoolType), nullable=False, default=SchoolType.UNKNOWN)
+
+    # Relationships
+    region = relationship("Region", back_populates="schools")
+    council = relationship("Council", back_populates="schools")
+    ward = relationship("Ward", back_populates="schools")
+    students = relationship("Student", back_populates="school")
+    users = relationship("User", back_populates="school")
+
+from sqlalchemy import Column, ForeignKeyConstraint, String, Float, Integer, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+
+class StudentSubject(Base):
+    __tablename__ = "student_subjects"
+
+    exam_id = Column(String(36), ForeignKey("exams.exam_id"), primary_key=True)
+    student_id = Column(String(20), ForeignKey("students.student_id"), primary_key=True)  # Added ForeignKey
+    subject_code = Column(String(10), primary_key=True)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["exam_id", "subject_code"],
+            ["exam_subjects.exam_id", "exam_subjects.subject_code"],
+            ondelete="CASCADE"
+        ),
+    )
+
+    theory_marks = Column(Float)
+    practical_marks = Column(Float)
+    overall_marks = Column(Float)
+    subj_pos = Column(Integer)
+    subj_ward_pos = Column(Integer)
+    subj_council_pos = Column(Integer)
+    subj_region_pos = Column(Integer)
+    subj_ward_pos_gvt = Column(Integer)
+    subj_ward_pos_pvt = Column(Integer)
+    subj_ward_pos_unknown = Column(Integer)
+    subj_council_pos_gvt = Column(Integer)
+    subj_council_pos_pvt = Column(Integer)
+    subj_council_pos_unknown = Column(Integer)
+    subj_region_pos_gvt = Column(Integer)
+    subj_region_pos_pvt = Column(Integer)
+    subj_region_pos_unknown = Column(Integer)
+    submitted_by = Column(String(100))
+    subj_pos_out_of = Column(Integer)
+    subj_ward_pos_out_of = Column(Integer)
+    subj_council_pos_out_of = Column(Integer)
+    subj_region_pos_out_of = Column(Integer)
+    subj_ward_pos_gvt_out_of = Column(Integer)
+    subj_ward_pos_pvt_out_of = Column(Integer)
+    subj_ward_pos_unknown_out_of = Column(Integer)
+    subj_council_pos_gvt_out_of = Column(Integer)
+    subj_council_pos_pvt_out_of = Column(Integer)
+    subj_council_pos_unknown_out_of = Column(Integer)
+    subj_region_pos_gvt_out_of = Column(Integer)
+    subj_region_pos_pvt_out_of = Column(Integer)
+    subj_region_pos_unknown_out_of = Column(Integer)
+
+    # Relationships
+    exam = relationship("Exam", back_populates="student_subjects")
+    student = relationship("Student", back_populates="student_subjects")
+    exam_subject = relationship("ExamSubject", back_populates="student_subjects")
+
+from sqlalchemy import Column, String, Enum, Date, DateTime, ForeignKey, Computed, text
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+import enum
+
+class Sex(str, enum.Enum):
+    MALE = "M"
+    FEMALE = "F"
+    OTHER = "Other"
+
+class Student(Base):
+    __tablename__ = "students"
+
+    student_global_id = Column(String(36), primary_key=True, default="uuid()")
+    student_id = Column(String(20), nullable=False, index=True)
+    first_name = Column(String(50), nullable=False)
+    middle_name = Column(String(50))
+    surname = Column(String(50), nullable=False)
+    full_name = Column(
+        String(150),
+        Computed("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', surname)", persisted=True)
+    )
+    sex = Column(Enum(Sex), nullable=False)
+    centre_number = Column(String(10), ForeignKey("schools.centre_number"), nullable=False)
+    date_of_birth = Column(Date)
+    created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+
+    # Relationships
+    school = relationship("School", back_populates="students")
+    results = relationship("Result", back_populates="student")
+    student_subjects = relationship("StudentSubject", back_populates="student")
+
+from sqlalchemy import Column, String, Boolean
+from sqlalchemy.orm import relationship
+from app.db.base import Base
+
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    subject_code = Column(String(10), primary_key=True)
+    subject_name = Column(String(50), nullable=False)
+    subject_short = Column(String(50), nullable=False)
+    has_practical = Column(Boolean, nullable=False)
+    exclude_from_gpa=Column(Boolean,default=False)
+
+    # Relationships
+    exam_subjects = relationship("ExamSubject", back_populates="subject")
+
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey
+from sqlalchemy.orm import relationship
+from app.db.database import Base
+import enum
+
+class UserExamRole(str, enum.Enum):
+    VIEWER = "VIEWER"
+    UPLOADER = "UPLOADER"
+    EXAM_ADMIN = "EXAM_ADMIN"
+
+class UserExam(Base):
+    __tablename__ = "user_exams"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    exam_id = Column(String(36), ForeignKey("exams.exam_id", ondelete="CASCADE"), primary_key=True)
+    role = Column(Enum(UserExamRole), nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="user_exams")
+    exam = relationship("Exam", back_populates="user_exams")
+
+from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey
+from sqlalchemy.sql import text
+from sqlalchemy.orm import relationship
+from app.db.base import Base
+import enum
+
+class Role(str, enum.Enum):
+    USER = "USER"
+    TEACHER = "TEACHER"
+    ACADEMIC_MASTER = "ACADEMIC_MASTER"
+    HEAD_OF_SCHOOL = "HEAD_OF_SCHOOL"
+    WEO = "WEO"
+    DEO = "DEO"
+    REO = "REO"
+    ADMIN = "ADMIN"
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    first_name = Column(String(255), nullable=False)
+    middle_name = Column(String(255))
+    surname = Column(String(255), nullable=False)
+    role = Column(Enum(Role), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    updated_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verification_token = Column(String(255))
+    verification_token_expires = Column(DateTime)
+    reset_token = Column(String(255))
+    reset_token_expires = Column(DateTime)
+    google_id = Column(String(255), unique=True)
+    is_google_account = Column(Boolean, default=False)
+    last_login = Column(DateTime)
+
+    # Foreign key to School
+    centre_number = Column(String(10), ForeignKey("schools.centre_number", ondelete="SET NULL"))
+
+    # Relationships
+    school = relationship("School", back_populates="users")
+    user_exams = relationship("UserExam", back_populates="user")

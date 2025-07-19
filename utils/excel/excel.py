@@ -6,7 +6,13 @@ import aiomysql
 from dotenv import load_dotenv
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
-import asyncio
+# from app.schemas.school import SchoolType
+from app.db.models.school import SchoolType
+from sqlalchemy import select, and_, func
+from app.db.models import School, Ward, Council, Region, StudentSubject, ExamSubject, Student
+from app.db.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 # Load environment variables
 if not os.path.exists('.env'):
@@ -26,7 +32,7 @@ DB_CONFIG = {
     'port': int(os.getenv('DB_PORT', 3306)),
     'user': os.getenv('DB_USER', 'root'),
     'password': os.getenv('DB_PASSWORD', ''),
-    'db': os.getenv('DB_NAME', 'kiyaboapp'),
+    'db': os.getenv('DB_NAME', 'exametrics'),
     'maxsize': int(os.getenv('DB_POOL_SIZE', 5))
 }
 
@@ -134,16 +140,16 @@ async def export_to_excel(
         params = [exam_id]
         location_filter = []
         if ward_id:
-            location_filter.append("school_info.ward_id = %s")
+            location_filter.append("schools.ward_id = %s")
             params.append(ward_id)
         if council_name:
-            location_filter.append("school_info.council_name = %s")
+            location_filter.append("schools.council_name = %s")
             params.append(council_name)
         if region_name:
-            location_filter.append("school_info.region_name = %s")
+            location_filter.append("schools.region_name = %s")
             params.append(region_name)
         if school_type:
-            location_filter.append("school_info.school_type = %s")
+            location_filter.append("schools.school_type = %s")
             params.append(school_type)
         
         if location_filter:
@@ -156,12 +162,12 @@ async def export_to_excel(
         sql = f"""
         SELECT students.student_id, students.full_name, students.sex,
                exam_subjects.subject_code, exam_subjects.subject_name, exam_subjects.subject_short,
-               school_info.centre_number, school_info.school_name,
-               wards.ward_name, school_info.council_name, school_info.region_name,
-               school_info.school_type, exam_subjects.has_practical
-        FROM school_info
-        LEFT JOIN wards ON school_info.ward_id = wards.ward_id
-        INNER JOIN students ON school_info.centre_number = students.centre_number
+               school_info.centre_number, schools.school_name,
+               wards.ward_name, schools.council_name, schools.region_name,
+               schools.school_type, exam_subjects.has_practical
+        FROM schools
+        LEFT JOIN wards ON schools.ward_id = wards.ward_id
+        INNER JOIN students ON schools.centre_number = students.centre_number
         INNER JOIN (exam_subjects INNER JOIN student_subjects
                     ON exam_subjects.subject_code = student_subjects.subject_code
                     AND exam_subjects.exam_id = student_subjects.exam_id)
@@ -419,6 +425,7 @@ async def export_to_excel(
             await pool.wait_closed()
 
 
+
 async def import_marks_from_excel(file_path: str) -> int:
     """Read marks from an Excel file and update student_subjects table. Return number of updated records."""
     pool = None
@@ -553,7 +560,7 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
         FROM student_subjects ss
         INNER JOIN exam_subjects es ON ss.exam_id = es.exam_id AND ss.subject_code = es.subject_code
         INNER JOIN students s ON ss.student_id = s.student_id
-        INNER JOIN school_info si ON s.centre_number = si.centre_number
+        INNER JOIN schools si ON s.centre_number = si.centre_number
         WHERE ss.exam_id = %s
         """
         await cursor.execute(query, (exam_id,))
@@ -810,17 +817,14 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
             await pool.wait_closed()
 
             
-# async def main():
-#     try:
-#         exam_id="00eb6d05-6173-11f0-b610-80b655697afc"
-#         updates=await calculate_marks_and_ranks(exam_id)
-#         print(f"Updated {updates} records for exam_id={exam_id}")
-#     except Exception as e:
-#         logger.error(f"Main function failed: {e}")
-#         raise
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
+async def main():
+    try:
+        exam_id="00eb6d05-6173-11f0-b610-80b655697afc"
+        updates=await calculate_marks_and_ranks(exam_id)
+        print(f"Updated {updates} records for exam_id={exam_id}")
+    except Exception as e:
+        logger.error(f"Main function failed: {e}")
+        raise
 
 
 # if __name__ == "__main__":
@@ -841,3 +845,7 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
     
 #     asyncio.run(main())
 
+
+
+# if __name__ == "__main__":
+#     asyncio.run(main())

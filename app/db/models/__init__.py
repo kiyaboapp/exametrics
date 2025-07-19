@@ -1,7 +1,7 @@
 from .region import Region
 from .council import Council
 from .ward import Ward
-from .school import School
+from .school import School,SchoolType
 from .user import User
 from .user_exam import UserExam
 from .examination_board import ExamBoard
@@ -30,4 +30,5 @@ __all__ = [
     "Student",
     "Result",
     "StudentSubject",
+    "SchoolType"
 ]

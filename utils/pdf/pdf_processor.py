@@ -42,7 +42,7 @@ class PDFTableProcessor:
                 'port': int(os.getenv('DB_PORT', 3306)),
                 'user': os.getenv('DB_USER', 'root'),
                 'password': os.getenv('DB_PASSWORD', ''),
-                'db': os.getenv('DB_NAME', 'kiyaboapp'),
+                'db': os.getenv('DB_NAME', 'exametrics'),
                 'pool_size': int(os.getenv('DB_POOL_SIZE', 5)),
                 'max_queries': int(os.getenv('DB_MAX_QUERIES', 5000))
             }
@@ -551,7 +551,7 @@ class PDFTableProcessor:
         # 1. Register school_info
         school_data = data['school_info']
         insert_school = f"""
-        INSERT IGNORE INTO school_info (centre_number, school_name, school_type)
+        INSERT IGNORE INTO schools (centre_number, school_name, school_type)
         VALUES ('{school_data['CENTRE_NUMBER'].replace("'", "''")}', '{school_data['SCHOOL_NAME'].replace("'", "''")}', 'unknown');
         """
         insert_statements.append(insert_school)
@@ -643,7 +643,7 @@ class PDFTableProcessor:
         conn = None
         cursor = None
         # Initialize results for tables that might be affected
-        possible_tables = ['examination_boards', 'exams', 'school_info', 'exam_subjects', 'students', 'student_subjects']
+        possible_tables = ['examination_boards', 'exams', 'schools', 'exam_subjects', 'students', 'student_subjects']
         results = {table: {'inserted': 0, 'duplicates': 0, 'failures': 0} for table in possible_tables}
         results['errors'] = []
 
