@@ -210,43 +210,31 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
     
     students_df, report_df = BatchPDFProcessor.process_pdf_files(pdf_paths, split_names=False)
     
-    logging.info(f"students_df columns: {list(students_df.columns)}")
-    logging.info(f"students_df sample (first 2 rows):\n{students_df.head(2).to_dict(orient='records')}")
-    logging.info(f"report_df columns: {list(report_df.columns)}")
-    logging.info(f"report_df sample:\n{report_df.to_dict(orient='records')}")
-    
     required_columns = ['CENTRE NUMBER', 'SCHOOL NAME', 'SCHOOL TYPE']
     missing_columns = [col for col in required_columns if col not in report_df.columns]
     if missing_columns:
-        logging.error(f"Missing columns in report_df: {missing_columns}")
         raise HTTPException(status_code=500, detail=f"Missing columns in report_df: {missing_columns}")
     
     required_student_columns = ['CANDIDATE', 'FULL NAME', 'SEX', 'CENTRE_NUMBER']
     missing_student_columns = [col for col in required_student_columns if col not in students_df.columns]
     if missing_student_columns:
-        logging.error(f"Missing columns in students_df: {missing_student_columns}")
         raise HTTPException(status_code=500, detail=f"Missing columns in students_df: {missing_student_columns}")
     
     valid_centres = set(report_df['CENTRE NUMBER'])
     student_centres = set(students_df['CENTRE_NUMBER'])
     invalid_centres = student_centres - valid_centres
     if invalid_centres:
-        logging.error(f"Students_df contains CENTRE_NUMBER values not in report_df: {invalid_centres}")
         raise HTTPException(status_code=400, detail=f"Invalid CENTRE_NUMBER values in students_df: {invalid_centres}")
     
     for _, school_row in report_df.iterrows():
         centre_number = school_row.get('CENTRE NUMBER', 'UNKNOWN_CENTRE')
         school_name = school_row.get('SCHOOL NAME', 'UNKNOWN_SCHOOL')
         school_type = school_row.get('SCHOOL TYPE', 'UNKNOWN')
-        status = school_row.get('STATUS', 'Unknown')
-        logging.info(f"Processing school: centre_number={centre_number}, name={school_name}, type={school_type}, status={status}")
-        
         result = await db.execute(select(SchoolModel).filter(SchoolModel.centre_number == centre_number))
         school = result.scalars().first()
         if school:
             school.school_name = school_name
             school.school_type = school_type
-            logging.info(f"Updated school: {centre_number}")
         else:
             school_data = {
                 "centre_number": centre_number,
@@ -257,15 +245,12 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
                 school_data = await resolve_location_data(db, school_data)
                 school = SchoolModel(**school_data)
                 db.add(school)
-                logging.info(f"Registered new school: {centre_number}")
-            except HTTPException as e:
-                logging.warning(f"Failed to resolve location for school {centre_number}: {e.detail}")
+            except HTTPException:
                 continue
     
     await db.commit()
     
     subject_codes = [col for col in students_df.columns if re.match(r'^\d{3}$', col)]
-    logging.info(f"Subject codes found: {subject_codes}")
     with db.no_autoflush:
         for code in subject_codes:
             subject_name = f"SUBJECT {code}"
@@ -283,7 +268,6 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
                 db.add(subject)
                 await db.commit()
                 await db.refresh(subject)
-                logging.info(f"Registered subject: {code}")
             result = await db.execute(select(ExamSubject).filter(ExamSubject.exam_id == exam_id, ExamSubject.subject_code == code))
             exam_subject = result.scalars().first()
             if not exam_subject:
@@ -296,54 +280,93 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
                     exclude_from_gpa=subject.exclude_from_gpa if subject.exclude_from_gpa is not None else False
                 )
                 db.add(exam_subject)
-                logging.info(f"Registered exam subject: {code}")
     
     await db.commit()
+    
+    existing_students = {}
+    result = await db.execute(
+        select(Student.student_id, Student.centre_number, Student.student_global_id)
+        .filter(Student.exam_id == exam_id, Student.centre_number.in_(student_centres))
+    )
+    for row in result.fetchall():
+        existing_students[(row.student_id, row.centre_number)] = row.student_global_id
+    
+    students_to_add = []
+    student_subjects_to_add = []
+    student_global_ids = {}
     
     for _, row in students_df.iterrows():
         student_id = row['CANDIDATE']
         centre_number = row['CENTRE_NUMBER']
-        full_name = row['FULL NAME'].strip().split()
-        if len(full_name) >= 3:
-            first_name = full_name[0]
-            surname = full_name[-1]
-            middle_name = ' '.join(full_name[1:-1]) or None
-        elif len(full_name) == 2:
-            first_name = full_name[0]
-            middle_name = None
-            surname = full_name[1]
-        else:
-            first_name = full_name[0]
-            middle_name = None
-            surname = None
-        result = await db.execute(select(Student).filter(Student.exam_id == exam_id, Student.student_id == student_id, Student.centre_number == centre_number))
-        student = result.scalars().first()
-        if not student:
-            student = Student(
-                student_global_id=str(uuid6()),
-                exam_id=exam_id,
-                student_id=student_id,
-                centre_number=centre_number,
-                first_name=first_name,
-                middle_name=middle_name,
-                surname=surname or "-",
-                sex=Sex(row['SEX'])
+        if (student_id, centre_number) not in existing_students:
+            full_name = row['FULL NAME'].strip().split()
+            if len(full_name) >= 3:
+                first_name = full_name[0]
+                surname = full_name[-1]
+                middle_name = ' '.join(full_name[1:-1]) or None
+            elif len(full_name) == 2:
+                first_name = full_name[0]
+                middle_name = None
+                surname = full_name[1]
+            else:
+                first_name = full_name[0]
+                middle_name = None
+                surname = None
+            student_global_id = str(uuid6())
+            students_to_add.append(
+                Student(
+                    student_global_id=student_global_id,
+                    exam_id=exam_id,
+                    student_id=student_id,
+                    centre_number=centre_number,
+                    first_name=first_name,
+                    middle_name=middle_name,
+                    surname=surname or "-",
+                    sex=Sex(row['SEX'])
+                )
             )
-            db.add(student)
-            logging.info(f"Added student: {student_id} for centre: {centre_number}")
-        for code in subject_codes:
-            if pd.notna(row[code]):
-                result = await db.execute(select(StudentSubject).filter(StudentSubject.exam_id == exam_id, StudentSubject.student_global_id == student.student_global_id, StudentSubject.centre_number == centre_number, StudentSubject.subject_code == code))
-                student_subject = result.scalars().first()
-                if not student_subject:
-                    student_subject = StudentSubject(
-                        id=str(uuid6()),
-                        exam_id=exam_id,
-                        student_global_id=student.student_global_id,
-                        centre_number=centre_number,
-                        subject_code=code
-                    )
-                    db.add(student_subject)
-                    logging.info(f"Added subject {code} for student: {student_id}")
+            student_global_ids[(student_id, centre_number)] = student_global_id
+        else:
+            logging.info(f"Skipping duplicate student: {student_id} in centre {centre_number}")
+            student_global_ids[(student_id, centre_number)] = existing_students[(student_id, centre_number)]
     
-    await db.commit()
+    if students_to_add:
+        db.add_all(students_to_add)
+        try:
+            await db.commit()
+        except Exception as e:
+            logging.error(f"Failed to insert students: {str(e)}")
+            raise
+    
+    existing_student_subjects = set()
+    result = await db.execute(
+        select(StudentSubject.student_global_id, StudentSubject.subject_code)
+        .filter(StudentSubject.exam_id == exam_id, StudentSubject.centre_number.in_(student_centres))
+    )
+    for row in result.fetchall():
+        existing_student_subjects.add((row.student_global_id, row.subject_code))
+    
+    for _, row in students_df.iterrows():
+        student_id = row['CANDIDATE']
+        centre_number = row['CENTRE_NUMBER']
+        student_global_id = student_global_ids.get((student_id, centre_number))
+        if student_global_id:
+            for code in subject_codes:
+                if pd.notna(row[code]) and (student_global_id, code) not in existing_student_subjects:
+                    student_subjects_to_add.append(
+                        StudentSubject(
+                            id=str(uuid6()),
+                            exam_id=exam_id,
+                            student_global_id=student_global_id,
+                            centre_number=centre_number,
+                            subject_code=code
+                        )
+                    )
+    
+    if student_subjects_to_add:
+        db.add_all(student_subjects_to_add)
+        try:
+            await db.commit()
+        except Exception as e:
+            logging.error(f"Failed to insert student subjects: {str(e)}")
+            raise
