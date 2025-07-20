@@ -42,7 +42,7 @@ async def main():
                 continue    
             
             # info=PDFTableProcessor.parse_pdf_to_data(pdf_path)
-            info=BatchPDFProcessor.process_pdf_files(files)
+            info=PDFTableProcessor.parse_pdf_to_data(pdf_path)
             print(info)
 
             # Initialize PDF processor

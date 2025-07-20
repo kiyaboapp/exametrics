@@ -5,7 +5,7 @@ from datetime import date
 from app.db.models.exam import AvgStyle, ExamLevel
 
 class ExamBase(BaseModel):
-    exam_id: str
+    exam_id: Optional[str]=None
     board_id: str
     exam_name: str
     exam_name_swahili: Optional[str]=None

@@ -248,64 +248,82 @@ class PDFTableProcessor:
         """Process student data tables"""
         processed_tables = []
         columns_removed = set()
-        
+
         for i, table in enumerate(tables):
-            # logger.info(f"Processing table {i + 1}/{len(tables)} with columns: {list(table.columns)}")
-            
-            # Standardize column names
-            table.columns = [str(col).strip().upper() for col in table.columns]
-            # logger.info(f"Standardized columns for table {i + 1}: {list(table.columns)}")
-            
-            # Check for duplicate columns
+            # Step 1: Clean and validate column names
+            cleaned_columns = []
+            for col in table.columns:
+                col_str = str(col).strip().upper() if col is not None else ''
+                cleaned_columns.append(col_str if col_str != '' else None)  # Mark empty/invalid as None
+
+            # Step 2: Filter out None (invalid) columns and corresponding data
+            valid_column_indices = [i for i, col in enumerate(cleaned_columns) if col is not None]
+            valid_columns = [cleaned_columns[i] for i in valid_column_indices]
+            table = table.iloc[:, valid_column_indices]
+            table.columns = valid_columns
+
+            if not table.columns.any():
+                logger.warning(f"Table {i + 1} has no valid columns after stripping. Skipping.")
+                continue
+
+            # Step 3: Handle duplicate columns
             if len(table.columns) != len(set(table.columns)):
                 duplicates = [col for col in table.columns if list(table.columns).count(col) > 1]
                 logger.warning(f"Duplicate columns found in table {i + 1}: {duplicates}")
-                # Rename duplicates by appending an index
                 new_columns = []
                 col_count = {}
                 for col in table.columns:
                     if col in col_count:
                         col_count[col] += 1
-                        new_columns.append(f"COL_{col_count[col]}" if col == '' else f"{col}_{col_count[col]}")
+                        new_columns.append(f"{col}_{col_count[col]}")
                     else:
                         col_count[col] = 0
                         new_columns.append(col)
                 table.columns = new_columns
                 logger.info(f"Renamed columns to resolve duplicates in table {i + 1}: {list(table.columns)}")
-            
+
+            # Step 4: Ensure core columns exist
             core_columns = ['CANDIDATE', 'SEX', 'FULL NAME']
             for col in core_columns:
                 if col not in table.columns:
                     table[col] = np.nan
                     logger.info(f"Added missing core column '{col}' to table {i + 1}")
-            
+
+            # Step 5: Process subject columns with numeric 3-digit codes
             for col in table.columns:
                 if str(col).isdigit() and len(col) == 3:
-                    table[col] = table[col].apply(
+                    table.loc[:, col] = table[col].apply(  # ✅ Use .loc to avoid SettingWithCopyWarning
                         lambda x: 1 if str(x).strip().lower() in ['✓', '✔', 'x', 'tick'] else np.nan
                     )
-            
+
+            # Step 6: Optionally remove last 3 columns (footer columns)
             original_columns = list(table.columns)
-            original_count = len(original_columns)
-            
-            if original_count >= 4:
+            if len(original_columns) >= 4:
                 columns_to_keep = original_columns[:-3]
                 removed_cols = original_columns[-3:]
                 columns_removed.update(removed_cols)
-                table = table[columns_to_keep]
-                # logger.info(f"Removed last 3 columns from table {i + 1}: {removed_cols}")
-            
+                table = table[columns_to_keep].copy()  # ✅ Use .copy() to ensure we're working on a fresh object
+
             processed_tables.append(table)
-        
-        # logger.info(f"Concatenating {len(processed_tables)} tables with columns: {[list(t.columns) for t in processed_tables]}")
+
+        # Step 7: Merge and clean the final DataFrame
+        if not processed_tables:
+            logger.error("No valid tables found to process.")
+            raise ValueError("No valid student data tables available.")
+
         try:
             merged = pd.concat(processed_tables, ignore_index=True)
             # logger.info(f"Successfully concatenated tables into DataFrame with columns: {list(merged.columns)}")
         except Exception as e:
             # logger.error(f"Failed to concatenate tables: {str(e)}")
             raise
-        
+
         return merged.replace({np.nan: None})
+
+
+
+
+
 
     @staticmethod
     def _process_subjects_table(table: pd.DataFrame) -> pd.DataFrame:

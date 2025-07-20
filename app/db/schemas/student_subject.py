@@ -8,9 +8,9 @@ class StudentSubjectBase(BaseModel):
     student_global_id: str
     centre_number: str
     subject_code: str
-    theory_marks: float | None
-    practical_marks: float | None
-    overall_marks: float | None
+    theory_marks: Optional[float]=None
+    practical_marks: Optional[float]=None
+    overall_marks: Optional[float]=None
     subject_pos: Optional[int]=None
     subject_out_of: Optional[int]=None
     ward_subject_pos: Optional[int]=None

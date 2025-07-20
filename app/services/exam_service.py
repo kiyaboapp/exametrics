@@ -11,7 +11,12 @@ from app.db.schemas.exam_grade import ExamGradeCreate
 from uuid6 import uuid6
 
 async def create_exam(db: AsyncSession, exam: ExamCreate) -> Exam:
-    existing_exam = await db.execute(select(ExamModel).filter(ExamModel.exam_name == exam.exam_name, ExamModel.board_id == exam.board_id))
+    existing_exam = await db.execute(select(ExamModel).filter(
+        ExamModel.exam_name == exam.exam_name, 
+        ExamModel.board_id == exam.board_id,
+        ExamModel.exam_level==exam.exam_level
+        )
+    )
     if existing_exam.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

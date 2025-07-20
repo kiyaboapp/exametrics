@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 class ExamBoardBase(BaseModel):
-    board_id: str
+    board_id: Optional[str]=None
     name: str
     location: Optional[str]=None
     chairman: Optional[str]=None

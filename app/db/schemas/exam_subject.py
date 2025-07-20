@@ -2,7 +2,6 @@
 from pydantic import BaseModel, ConfigDict
 
 class ExamSubjectBase(BaseModel):
-    id: int
     exam_id: str
     subject_code: str
     subject_name: str
@@ -14,4 +13,5 @@ class ExamSubjectCreate(ExamSubjectBase):
     pass
 
 class ExamSubject(ExamSubjectBase):
+    id: int
     model_config = ConfigDict(from_attributes=True)

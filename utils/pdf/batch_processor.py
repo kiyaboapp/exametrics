@@ -58,13 +58,14 @@ class BatchPDFProcessor:
                 all_student_data.append(student_data)
 
                 report_data.append({
-                    'School Name': school_info.get('SCHOOL_NAME', ''),
-                    'Centre Number': school_info.get('CENTRE_NUMBER', ''),
-                    'Exam Type': school_info.get('EXAM_TYPE', ''),
-                    'Exam Year': school_info.get('EXAM_YEAR', ''),
-                    'Status': 'Success',
-                    'File Name': os.path.basename(pdf_path),
-                    'Students Count': len(student_data)
+                    'SCHOOL NAME': school_info.get('SCHOOL_NAME', ''),
+                    'CENTRE NUMBER': school_info.get('CENTRE_NUMBER', ''),
+                    'SCHOOL TYPE': school_info.get('SCHOOL_TYPE', ''),
+                    'EXAM TYPE': school_info.get('EXAM_TYPE', ''),
+                    'EXAM YEAR': school_info.get('EXAM_YEAR', ''),
+                    'STATUS': 'Success',
+                    'FILE NAME': os.path.basename(pdf_path),
+                    'STUDENT COUNT': len(student_data)
                 })
 
                 print(f"[BatchPDFProcessor] Processed {pdf_path}: {len(student_data)} students")
@@ -73,13 +74,14 @@ class BatchPDFProcessor:
                 error_message = f"Failed to process {pdf_path}: {e}"
                 traceback.print_exc()
                 report_data.append({
-                    'School Name': '',
-                    'Centre Number': '',
-                    'Exam Type': '',
-                    'Exam Year': '',
-                    'Status': error_message,
-                    'File Name': os.path.basename(pdf_path),
-                    'Students Count': 0
+                    'SCHOOL NAME': '',
+                    'CENTRE NUMBER': '',
+                    'SCHOOL TYPE': '',
+                    'EXAM TYPE': '',
+                    'EXAM YEAR': '',
+                    'STATUS': error_message,
+                    'FILE NAME': os.path.basename(pdf_path),
+                    'STUDENT NAME': 0
                 })
                 print(f"[BatchPDFProcessor] {error_message}")
                 continue
