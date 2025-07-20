@@ -102,7 +102,8 @@ class PDFTableProcessor:
             'EXAM_TYPE': '',
             'CENTRE_NUMBER': '',
             'EXAM_YEAR': '',
-            'SCHOOL_NAME': ''
+            'SCHOOL_NAME': '',
+            'SCHOOL_TYPE':''
         }
         
         prefix_mapping = {
@@ -115,10 +116,10 @@ class PDFTableProcessor:
             'N': 'SFNA'
         }
         
-        if first_candidate:
-            match = re.search(r'([A-Za-z]+)\d+', first_candidate.upper())
-            if match and match.group(1) and match.group(1)[0] in prefix_mapping:
-                school_info['EXAM_TYPE'] = prefix_mapping[match.group(1)[0]]
+        # if first_candidate:
+        #     match = re.search(r'([A-Za-z]+)\d+', first_candidate.upper())
+        #     if match and match.group(1) and match.group(1)[0] in prefix_mapping:
+        #         school_info['EXAM_TYPE'] = prefix_mapping[match.group(1)[0]]
 
         with pdfplumber.open(pdf_path) as pdf:
             text_lines = []
@@ -173,13 +174,18 @@ class PDFTableProcessor:
             return school_info
 
     @staticmethod
-    def _is_valid_necta(table: pd.DataFrame, table_index: int, is_fee_table: bool) -> bool:
-        """Validate NECTA document structure"""
+    def _is_valid_necta(table: pd.DataFrame, table_index: int, is_fee_table: bool) -> Tuple[bool, str]:
+        """Validate NECTA document structure and determine school type"""
         required = {'CANDIDATE', 'SEX', 'FULL NAME'}
         actual = set(str(c).upper() for c in table.columns)
         is_valid = len(required.intersection(actual)) >= 2
-        # logger.info(f"Validating table {table_index + 1}: Columns={list(table.columns)}, IsFeeTable={is_fee_table}, IsValidNECTA={is_valid}")
-        return is_valid
+        
+        school_type = ''
+        if is_valid:
+            school_type = "PRIVATE" if is_fee_table else "GOVERNMENT"
+        
+        # logger.info(f"Validating table {table_index + 1}: Columns={list(table.columns)}, IsFeeTable={is_fee_table}, IsValidNECTA={is_valid}, SchoolType={school_type}")
+        return is_valid, school_type
 
     @staticmethod
     def extract_tables(pdf_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, str]]:
@@ -218,7 +224,8 @@ class PDFTableProcessor:
                 logger.error("No tables available after skipping fee table")
                 raise ValueError("No valid tables found after fee table")
             
-            if not PDFTableProcessor._is_valid_necta(tables[start_index], start_index, is_fee_table):
+            is_valid, school_type = PDFTableProcessor._is_valid_necta(tables[start_index], start_index, is_fee_table)
+            if not is_valid:
                 logger.error(f"Table {start_index + 1} is not a valid NECTA document")
                 raise ValueError("Invalid NECTA document format")
             
@@ -229,6 +236,7 @@ class PDFTableProcessor:
             
             first_candidate = tables[start_index].iloc[0, 0] if len(tables[start_index]) > 0 else None
             school_info = PDFTableProcessor.extract_school_info(pdf_path, first_candidate)
+            school_info['SCHOOL_TYPE'] = school_type
             
             main_data = PDFTableProcessor._process_main_tables(tables[start_index:-1])
             subjects_df = PDFTableProcessor._process_subjects_table(tables[-1])

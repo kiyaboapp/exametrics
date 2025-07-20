@@ -3,7 +3,7 @@
 import os
 import pandas as pd
 from typing import List, Tuple
-from app.utils.pdf_processor import PDFTableProcessor
+from utils.pdf.pdf_processor import PDFTableProcessor
 import traceback
 from datetime import datetime
 import numpy as np

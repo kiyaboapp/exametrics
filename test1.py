@@ -3,6 +3,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from utils.pdf.pdf_processor import PDFTableProcessor
+from utils.pdf.batch_processor import BatchPDFProcessor
 from app.db.database import get_db, init_db  # Import get_db and init_db
 from utils.excel.excel import export_to_excel  # Adjust path as needed
 
@@ -23,10 +24,13 @@ async def main():
     files = [
         r"C:\Users\droge\OneDrive\Documents\NASCO F4 PRINT OUT.pdf",
         r"C:\Users\droge\OneDrive\Documents\FAMGI F4 PRINT OUT.pdf",
-        "doc (28).pdf",
         r"C:\Users\droge\OneDrive\Documents\doc - 2025-07-11T105318.471 (2).pdf",
         r"C:\Users\droge\OneDrive\Documents\doc (26).pdf"
     ]
+
+    info=BatchPDFProcessor.process_pdf_files(files)
+    print(info)
+    return
 
     for pdf_path in files:
         try:
@@ -36,29 +40,33 @@ async def main():
                 logger.error(f"PDF file does not exist: {pdf_path}")
                 print(f"Error: PDF file does not exist: {pdf_path}")
                 continue    
+            
+            # info=PDFTableProcessor.parse_pdf_to_data(pdf_path)
+            info=BatchPDFProcessor.process_pdf_files(files)
+            print(info)
 
             # Initialize PDF processor
-            processor = PDFTableProcessor()
-            logger.info(f"Generating insert statements for PDF: {pdf_path}")
-            statements = processor.prepare_insert_statements(pdf_path, exam_id=exam_id)
+            # processor = PDFTableProcessor()
+            # logger.info(f"Generating insert statements for PDF: {pdf_path}")
+            # statements = processor.prepare_insert_statements(pdf_path, exam_id=exam_id)
 
-            if not statements:
-                logger.error(f"No insert statements generated for {pdf_path}")
-                print(f"Error: No insert statements generated for {pdf_path}")
-                continue
+            # if not statements:
+            #     logger.error(f"No insert statements generated for {pdf_path}")
+            #     print(f"Error: No insert statements generated for {pdf_path}")
+            #     continue
 
-            logger.info(f"Generated {len(statements)} insert statements for {pdf_path}")
-            # Print third statement for debugging
-            print(f"Third statement: {statements[2] if len(statements) > 2 else 'Not enough statements'}")
+            # logger.info(f"Generated {len(statements)} insert statements for {pdf_path}")
+            # # Print third statement for debugging
+            # print(f"Third statement: {statements[2] if len(statements) > 2 else 'Not enough statements'}")
 
-            # Execute insert statements using static method
-            result = await PDFTableProcessor.execute_insert_statements(statements)
-            if result is None:
-                logger.error(f"execute_insert_statements returned None for {pdf_path}")
-                print(f"Error: execute_insert_statements returned None for {pdf_path}")
-                continue
+            # # Execute insert statements using static method
+            # result = await PDFTableProcessor.execute_insert_statements(statements)
+            # if result is None:
+            #     logger.error(f"execute_insert_statements returned None for {pdf_path}")
+            #     print(f"Error: execute_insert_statements returned None for {pdf_path}")
+            #     continue
 
-            print(f"Execution result for {pdf_path}: {result}")
+            # print(f"Execution result for {pdf_path}: {result}")
 
         except FileNotFoundError:
             logger.error(f"PDF file not found: {pdf_path}")
@@ -91,7 +99,7 @@ async def hahaha():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(hahaha())
+        asyncio.run(main())
     except Exception as e:
         logger.error(f"Event loop error: {str(e)}")
         print(f"Error: {str(e)}")

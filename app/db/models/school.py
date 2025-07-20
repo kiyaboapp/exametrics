@@ -1,4 +1,5 @@
 
+from fastapi import HTTPException
 from sqlalchemy import Column, String, Integer, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.db.database import Base
