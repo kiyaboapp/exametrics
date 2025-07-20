@@ -1,9 +1,9 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey
-from sqlalchemy.sql import text
+
+from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, text, Enum
 from sqlalchemy.orm import relationship
-from app.db.base import Base
-import enum
+from app.db.database import Base
 from uuid6 import uuid6
+import enum
 
 class Role(str, enum.Enum):
     USER = "USER"
@@ -17,30 +17,17 @@ class Role(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-
     id = Column(String(36), primary_key=True, default=lambda: str(uuid6()))
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     first_name = Column(String(255), nullable=False)
     middle_name = Column(String(255))
     surname = Column(String(255), nullable=False)
-    role = Column(Enum(Role), nullable=False)
+    role = Column(Enum(Role), nullable=False)  # MySQL: Native ENUM
     hashed_password = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    updated_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    is_active = Column(Boolean, nullable=False, default=True)
-    is_verified = Column(Boolean, nullable=False, default=False)
-    verification_token = Column(String(255))
-    verification_token_expires = Column(DateTime)
-    reset_token = Column(String(255))
-    reset_token_expires = Column(DateTime)
-    google_id = Column(String(255), unique=True)
-    is_google_account = Column(Boolean, default=False)
-    last_login = Column(DateTime)
-
-    # Foreign key to School
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
     centre_number = Column(String(10), ForeignKey("schools.centre_number", ondelete="SET NULL"))
-
-    # Relationships
+    created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     school = relationship("School", back_populates="users")
     user_exams = relationship("UserExam", back_populates="user")

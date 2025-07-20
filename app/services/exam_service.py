@@ -1,32 +1,29 @@
-# app/services/exam_service.py
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from app.db.models.exam import Exam, ExamLevel
-from app.db.models.exam_division import ExamDivision
-from app.db.models.exam_grade import ExamGrade
-from app.schemas.exam import ExamCreate, Exam
-from app.schemas.exam_division import ExamDivisionCreate
-from app.schemas.exam_grade import ExamGradeCreate
+from app.db.models.exam import Exam as ExamModel, ExamLevel
+from app.db.models.exam_division import ExamDivision as ExamDivisionModel
+from app.db.models.exam_grade import ExamGrade as ExamGradeModel
+from app.db.schemas.exam import ExamCreate, Exam
+from app.db.schemas.exam_division import ExamDivisionCreate
+from app.db.schemas.exam_grade import ExamGradeCreate
 from uuid6 import uuid6
 
 async def create_exam(db: AsyncSession, exam: ExamCreate) -> Exam:
-    # Check for existing exam
-    existing_exam = await db.execute(select(Exam).filter(Exam.exam_name == exam.exam_name, Exam.board_id == exam.board_id))
+    existing_exam = await db.execute(select(ExamModel).filter(ExamModel.exam_name == exam.exam_name, ExamModel.board_id == exam.board_id))
     if existing_exam.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Exam already exists with this name and board"
         )
-    
-    exam_data = exam.dict()
+    exam_data = exam.model_dump()
     exam_data["exam_id"] = str(uuid6())
-    db_exam = Exam(**exam_data)
+    db_exam = ExamModel(**exam_data)
     db.add(db_exam)
     await db.commit()
     await db.refresh(db_exam)
     
-    # Add grades and divisions for FTNA, CSEE, ACSEE
     if exam.exam_level in [ExamLevel.FTNA, ExamLevel.CSEE]:
         divisions = [
             ExamDivisionCreate(exam_id=db_exam.exam_id, division="I", lowest_points=7, highest_points=17),
@@ -64,23 +61,23 @@ async def create_exam(db: AsyncSession, exam: ExamCreate) -> Exam:
         grades = []
 
     for division in divisions:
-        db_division = ExamDivision(**division.dict())
+        db_division = ExamDivisionModel(**division.model_dump())
         db.add(db_division)
     
     for grade in grades:
-        db_grade = ExamGrade(**grade.dict())
+        db_grade = ExamGradeModel(**grade.model_dump())
         db.add(db_grade)
     
     await db.commit()
-    return Exam.from_orm(db_exam)
+    return Exam.model_validate(db_exam)
 
 async def get_exam(db: AsyncSession, exam_id: str) -> Exam:
-    result = await db.execute(select(Exam).filter(Exam.exam_id == exam_id))
+    result = await db.execute(select(ExamModel).filter(ExamModel.exam_id == exam_id))
     exam = result.scalars().first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
-    return Exam.from_orm(exam)
+    return Exam.model_validate(exam)
 
 async def get_exams(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[Exam]:
-    result = await db.execute(select(Exam).offset(skip).limit(limit))
-    return [Exam.from_orm(exam) for exam in result.scalars().all()]
+    result = await db.execute(select(ExamModel).offset(skip).limit(limit))
+    return [Exam.model_validate(exam) for exam in result.scalars().all()]

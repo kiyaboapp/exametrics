@@ -1,20 +1,44 @@
-# app/api/v1/auth.py
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.database import get_db
-from app.schemas.user import UserCreate, User
-from app.services.auth_service import create_user, authenticate_user
-from app.core.security import create_access_token
+from app.api.deps import get_db
+from app.db.schemas.user import User
+from app.services.user_service import get_user_by_username
+from app.core.security import verify_password, create_access_token
+from app.core.config import settings
+from datetime import timedelta
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
-@router.post("/register", response_model=User)
-async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    return await create_user(db, user)
+@router.get("/")
+async def all_endpoints(c):
+    return {"message": "All endpoints for authentication",
+            "/login": {
+                "method": "POST",
+                "description": "Login with username and password",
+                "request_body": {
+                    "username": "string",
+                    "password": "string"
+                },
+                "response": {
+                    "access_token": "string",
+                    "token_type": "string"
+                }
+            }
+            }
 
-@router.post("/login")
+@router.post("/login", response_model=dict)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    user = await authenticate_user(db, form_data.username, form_data.password)
-    access_token = create_access_token(data={"sub": user.username})
+    user = await get_user_by_username(db, form_data.username)
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     return {"access_token": access_token, "token_type": "bearer"}

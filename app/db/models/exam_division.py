@@ -1,3 +1,4 @@
+
 from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
@@ -9,10 +10,5 @@ class ExamDivision(Base):
     division = Column(String(3), nullable=False)
     lowest_points = Column(Integer, nullable=False)
     highest_points = Column(Integer, nullable=False)
-    
-    # Relationships
     exam = relationship("Exam", back_populates="exam_divisions")
-    
-    __table_args__ = (
-        UniqueConstraint('exam_id', 'division'),
-    )
+    __table_args__ = (UniqueConstraint("exam_id", "division"),)

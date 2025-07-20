@@ -1,3 +1,4 @@
+
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
 from app.db.database import Base
@@ -10,6 +11,4 @@ class ExamBoard(Base):
     location = Column(String(100))
     chairman = Column(String(100))
     secretary = Column(String(100))
-    
-    # Relationship
     exams = relationship("Exam", back_populates="board")

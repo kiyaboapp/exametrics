@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime, Index, UniqueConstraint, text
+
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Index, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 from uuid6 import uuid6
@@ -23,29 +24,17 @@ class Result(Base):
     region_out_of = Column(Integer)
     ward_pos_gvt = Column(Integer)
     ward_pos_pvt = Column(Integer)
-    ward_pos_unknown = Column(Integer)
     council_pos_gvt = Column(Integer)
     council_pos_pvt = Column(Integer)
-    council_pos_unknown = Column(Integer)
     region_pos_gvt = Column(Integer)
     region_pos_pvt = Column(Integer)
-    region_pos_unknown = Column(Integer)
-    first_marks = Column(Float)
-    second_marks = Column(Float)
-    third_marks = Column(Float)
-    fourth_marks = Column(Float)
-    fifth_marks = Column(Float)
-    sixth_marks = Column(Float)
-    seventh_marks = Column(Float)
     created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
-    
-    # Relationships
     student = relationship("Student", back_populates="results")
     exam = relationship("Exam", back_populates="results")
-    
+    school = relationship("School", back_populates="results")
     __table_args__ = (
-        UniqueConstraint('exam_id', 'student_global_id', 'centre_number'),
-        Index('idx_result_exam_id', 'exam_id'),
-        Index('idx_result_student_global_id', 'student_global_id'),
-        Index('idx_result_centre_number', 'centre_number'),
+        UniqueConstraint("exam_id", "student_global_id", "centre_number"),
+        Index("idx_result_exam_id", "exam_id"),
+        Index("idx_result_student_global_id", "student_global_id"),
+        Index("idx_result_centre_number", "centre_number"),
     )

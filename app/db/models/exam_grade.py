@@ -1,3 +1,4 @@
+
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
@@ -11,10 +12,5 @@ class ExamGrade(Base):
     highest_value = Column(Float, nullable=False)
     grade_points = Column(Float, nullable=False)
     division_points = Column(Integer, nullable=False)
-    
-    # Relationships
     exam = relationship("Exam", back_populates="exam_grades")
-    
-    __table_args__ = (
-        UniqueConstraint('exam_id', 'grade'),
-    )
+    __table_args__ = (UniqueConstraint("exam_id", "grade"),)
