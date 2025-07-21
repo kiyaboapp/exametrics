@@ -1,14 +1,9 @@
 
 from fastapi import HTTPException
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
-import enum
 
-class SchoolType(str, enum.Enum):
-    GOVERNMENT = "GOVERNMENT"
-    PRIVATE = "PRIVATE"
-    UNKNOWN = "UNKNOWN"
 
 class School(Base):
     __tablename__ = "schools"
@@ -20,7 +15,14 @@ class School(Base):
     region_name = Column(String(50))
     council_name = Column(String(50))
     ward_name = Column(String(100))
-    school_type = Column(Enum(SchoolType), nullable=False)  # MySQL: Native ENUM
+    school_type = Column(String(20), nullable=False) 
     students = relationship("Student", back_populates="school")
     results = relationship("Result", back_populates="school")
     users = relationship("User", back_populates="school")
+
+    __table_args__ = (
+        CheckConstraint(
+            "school_type IN ('GOVERNMENT', 'PRIVATE', 'UNKNOWN')", 
+            name="valid_school_type"
+        ),
+        )

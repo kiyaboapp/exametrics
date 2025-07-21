@@ -2,7 +2,7 @@
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from app.db.models.user import Role
+
 
 class UserBase(BaseModel):
     id: str
@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     first_name: str
     middle_name: Optional[str]= None
     surname: str
-    role: Role
+    role: str
     hashed_password: str
     is_active: bool
     is_verified: bool
@@ -24,7 +24,7 @@ class UserCreate(BaseModel):
     first_name: str
     middle_name: Optional[str]= None
     surname: str
-    role: Role
+    role: str
     password: str
     is_active: bool = True
     is_verified: bool = False

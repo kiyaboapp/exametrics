@@ -6,8 +6,6 @@ import aiomysql
 from dotenv import load_dotenv
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
-# from app.db.schemas.school import SchoolType
-from app.db.models.school import SchoolType
 from sqlalchemy import select, and_, func
 from app.db.models import School, Ward, Council, Region, StudentSubject, ExamSubject, Student
 from app.db.database import get_db

@@ -1,14 +1,9 @@
 
-from sqlalchemy import Column, String, ForeignKey, DateTime, UniqueConstraint, text, Enum
+from sqlalchemy import Column, Computed, String, ForeignKey, DateTime, UniqueConstraint, text,CheckConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 from uuid6 import uuid6
-import enum
 
-class Sex(str, enum.Enum):
-    MALE = "M"
-    FEMALE = "F"
-    OTHER = "OTHER"
 
 class Student(Base):
     __tablename__ = "students"
@@ -19,10 +14,22 @@ class Student(Base):
     first_name = Column(String(50), nullable=False)
     middle_name = Column(String(50))
     surname = Column(String(50), nullable=False)
-    sex = Column(Enum(Sex), nullable=False)  # MySQL: Native ENUM
+    sex = Column(String(5), nullable=False) 
+    full_name = Column(
+        String(160),
+        Computed("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(middle_name, ''), ' ', COALESCE(surname, ''))", 
+                persisted=True)
+    )
     created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     school = relationship("School", back_populates="students")
     exam = relationship("Exam", back_populates="students")
     student_subjects = relationship("StudentSubject", back_populates="student")
     results = relationship("Result", back_populates="student")
-    __table_args__ = (UniqueConstraint("exam_id", "student_id", "centre_number"),)
+
+    __table_args__ = (
+        UniqueConstraint("exam_id", "student_id", "centre_number"),
+        CheckConstraint(
+            "sex IN ('M', 'F', 'OTHER')", 
+            name="valid_sex"
+        ),
+    )

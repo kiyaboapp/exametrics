@@ -1,30 +1,26 @@
 # app/db/models/__init__.py
 
-from .school import School, SchoolType
-from .student import Student, Sex
+from .school import School
+from .student import Student
 from .examination_board import ExamBoard
-from .exam import Exam, AvgStyle, ExamLevel
+from .exam import Exam
 from .exam_division import ExamDivision
 from .exam_grade import ExamGrade
 from .subject import Subject
 from .exam_subject import ExamSubject
 from .result import Result
 from .student_subject import StudentSubject
-from .user import User, Role
-from .user_exam import UserExam, UserExamRole
+from .user import User
+from .user_exam import UserExam
 from .region import Region
 from .ward import Ward
 from .council import Council
 
 __all__ = [
     "School",
-    "SchoolType",
     "Student",
-    "Sex",
     "ExamBoard",
     "Exam",
-    "AvgStyle",
-    "ExamLevel",
     "ExamDivision",
     "ExamGrade",
     "Subject",
@@ -32,9 +28,7 @@ __all__ = [
     "Result",
     "StudentSubject",
     "User",
-    "Role",
     "UserExam",
-    "UserExamRole",
     "Region",
     "Council",
     "Ward"

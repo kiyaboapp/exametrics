@@ -15,6 +15,7 @@ from .student_subject import router as student_subject_router
 from .user import router as user_router
 from .user_exam import router as user_exam_router
 from .auth import router as auth_router
+from .isal import router as isal_router
 
 __all__ = [
     "region_router",
@@ -33,4 +34,5 @@ __all__ = [
     "user_router",
     "user_exam_router",
     "auth_router",
+    "isal_router",
 ]

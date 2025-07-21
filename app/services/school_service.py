@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from app.db.models.school import School as SchoolModel
 from app.db.models.subject import Subject
 from app.db.models.exam_subject import ExamSubject
-from app.db.models.student import Student, Sex
+from app.db.models.student import Student
 from app.db.models.student_subject import StudentSubject
 from app.db.models.exam import Exam
 from app.db.models.region import Region
@@ -184,7 +184,7 @@ async def process_pdf_data(db: AsyncSession, pdf_path: str, exam_id: str) -> Non
                 first_name=row['FIRST_NAME'],
                 middle_name=row['MIDDLE_NAME'],
                 surname=row['LAST_NAME'],
-                sex=Sex(row['SEX'])
+                sex=row['SEX']
             )
             db.add(student)
         subject_codes = [col for col in student_data.columns if re.match(r'^\d{3}$', col)]
@@ -322,7 +322,7 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
                     first_name=first_name,
                     middle_name=middle_name,
                     surname=surname or "-",
-                    sex=Sex(row['SEX'])
+                    sex=row['SEX']
                 )
             )
             student_global_ids[(student_id, centre_number)] = student_global_id

@@ -6,7 +6,7 @@ from app.api.v1 import (
     examination_board_router, exam_router, exam_division_router,
     exam_grade_router, exam_subject_router, subject_router,
     student_router, result_router, student_subject_router,
-    user_router, user_exam_router, auth_router
+    user_router, user_exam_router, auth_router,isal_router
 )
 from app.core.config import settings
 from app.db.database import init_db
@@ -49,6 +49,7 @@ app.include_router(student_subject_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(user_exam_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(isal_router,prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

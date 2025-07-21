@@ -1,18 +1,17 @@
 
 from pydantic import BaseModel, ConfigDict
-from app.db.models.user_exam import UserExamRole
 from typing import Dict
 
 class UserExamBase(BaseModel):
     user_id: str
     exam_id: str
-    role: UserExamRole
+    role: str
     permissions: Dict[str, bool]
 
 class UserExamCreate(BaseModel):
     user_id: str
     exam_id: str
-    role: UserExamRole
+    role: str
     permissions: Dict[str, bool] = {
         "edit": False,
         "view": True,

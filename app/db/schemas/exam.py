@@ -2,7 +2,6 @@
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from datetime import date
-from app.db.models.exam import AvgStyle, ExamLevel
 
 class ExamBase(BaseModel):
     exam_id: Optional[str]=None
@@ -11,8 +10,8 @@ class ExamBase(BaseModel):
     exam_name_swahili: Optional[str]=None
     start_date: date
     end_date: date
-    avg_style: AvgStyle
-    exam_level: ExamLevel
+    avg_style: str
+    exam_level: str
 
 class ExamCreate(ExamBase):
     pass

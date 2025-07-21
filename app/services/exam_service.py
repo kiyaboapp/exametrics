@@ -2,7 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from app.db.models.exam import Exam as ExamModel, ExamLevel
+from app.db.models.exam import Exam as ExamModel
 from app.db.models.exam_division import ExamDivision as ExamDivisionModel
 from app.db.models.exam_grade import ExamGrade as ExamGradeModel
 from app.db.schemas.exam import ExamCreate, Exam
@@ -29,7 +29,7 @@ async def create_exam(db: AsyncSession, exam: ExamCreate) -> Exam:
     await db.commit()
     await db.refresh(db_exam)
     
-    if exam.exam_level in [ExamLevel.FTNA, ExamLevel.CSEE]:
+    if exam.exam_level.upper() in ['FTNA','CSEE']:
         divisions = [
             ExamDivisionCreate(exam_id=db_exam.exam_id, division="I", lowest_points=7, highest_points=17),
             ExamDivisionCreate(exam_id=db_exam.exam_id, division="II", lowest_points=18, highest_points=22),
@@ -44,7 +44,7 @@ async def create_exam(db: AsyncSession, exam: ExamCreate) -> Exam:
             ExamGradeCreate(exam_id=db_exam.exam_id, grade="D", lower_value=30.0, highest_value=44.9, grade_points=4.0, division_points=4),
             ExamGradeCreate(exam_id=db_exam.exam_id, grade="F", lower_value=0.0, highest_value=29.9, grade_points=5.0, division_points=5),
         ]
-    elif exam.exam_level == ExamLevel.ACSEE:
+    elif exam.exam_level.upper() == 'ACSEE':
         divisions = [
             ExamDivisionCreate(exam_id=db_exam.exam_id, division="I", lowest_points=3, highest_points=9),
             ExamDivisionCreate(exam_id=db_exam.exam_id, division="II", lowest_points=10, highest_points=12),

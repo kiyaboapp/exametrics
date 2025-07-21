@@ -1,11 +1,3 @@
-# utils/pdf/async_attendance.py
-"""Async PDF generation for attendance reports using ReportLab.
-This module provides an asynchronous interface for generating attendance PDFs
-with thread-safe handling of ReportLab's canvas.
-It supports multiple subjects, student records, and customizable options.
-"""
-
-
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -17,7 +9,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-
+from datetime import datetime
 
 UPLOAD_DIR = "uploads/download"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -29,11 +21,8 @@ def initialize_fonts():
     global _fonts_initialized
     if not _fonts_initialized:
         try:
-            # Create fonts directory if it doesn't exist
             fonts_dir = Path("app/fonts")
             fonts_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Register fonts
             pdfmetrics.registerFont(TTFont("LucidaConsole", str(fonts_dir / "lucon.ttf")))
             pdfmetrics.registerFont(TTFont("DejaVuSans", str(fonts_dir / "DejaVuSans.ttf")))
             _fonts_initialized = True
@@ -45,10 +34,10 @@ initialize_fonts()
 # Constants
 DEFAULT_FONT = "LucidaConsole"
 FALLBACK_FONT = "DejaVuSans"
-MAX_WORKERS = 4  # Adjust based on your server capacity
+MAX_WORKERS = 4
 
 # Type aliases
-StudentRecord = Tuple[str, str, str]  # (Index, Candidate Name, Sex)
+StudentRecord = Tuple[str, str, str]
 SubjectData = Dict[str, List[StudentRecord]]
 SchoolInfo = Dict[str, str]
 
@@ -71,11 +60,43 @@ class AsyncAttendancePDFGenerator:
         Generate PDF asynchronously with thread-safe handling
         Returns path to generated PDF file
         """
-        # Create unique filename
         output_filename = f"ISAL-BY-KIYABO-APP-{uuid.uuid4().hex}.pdf"
-        output_path =os.path.join(UPLOAD_DIR, output_filename)
+        output_path = os.path.join(UPLOAD_DIR, output_filename)
         
-        # Run synchronous PDF generation in thread pool
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self._executor,
+            self._generate_sync,
+            str(output_path),
+            school_info,
+            subjects_data,
+            include_score,
+            underscore_mode,
+            separate_every
+        )
+        
+        return str(output_path)
+    
+    async def generate_pdf_with_naming(
+        self,
+        school_info: SchoolInfo,
+        subjects_data: SubjectData,
+        centre_number: str,
+        exam_year: int,
+        exam_level: str,
+        output_dir: str,
+        include_score: bool = True,
+        underscore_mode: bool = True,
+        separate_every: int = 10
+    ) -> str:
+        """
+        Generate PDF with custom naming convention and output directory
+        Returns path to generated PDF file
+        """
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        output_filename = f"{centre_number}-{exam_year}-{exam_level}-{timestamp}.pdf"
+        output_path = os.path.join(output_dir, output_filename)
+        
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             self._executor,
@@ -162,7 +183,7 @@ class _AttendancePDFGeneratorInternal:
         ]
         if self.include_score and score is not None:
             row.append(score)
-        return "|" + "|".join(row) + "|"
+        return "|" + "|".joint(row) + "|"
 
     def _draw_page_header(self, c, y, headers, widths, subject_name):
         c.setFont(DEFAULT_FONT, 11)
@@ -218,7 +239,6 @@ class _AttendancePDFGeneratorInternal:
         c.drawString(self.page_width - self.x_margin - width, 15 * mm, text)
 
     def generate(self):
-        # Column layout
         headers = ["INDEX", "CANDIDATE NAME", "SEX", "CAND. SIGNATURE", "ATTENDANCE"]
         widths = [13, 34, 6, 24, 13]
         if self.include_score:
@@ -228,7 +248,6 @@ class _AttendancePDFGeneratorInternal:
         c = canvas.Canvas(self.filename, pagesize=A4)
         global_page = 1
 
-        # Calculate total pages across all subjects
         total_pages = 0
         for students in self.subjects_data.values():
             total_students = len(students)
@@ -259,17 +278,14 @@ class _AttendancePDFGeneratorInternal:
 
         c.save()
 
-
 # Example usage in FastAPI route
 async def example_fastapi_usage():
     pdf_gen = AsyncAttendancePDFGenerator()
     
-    # Sample data
     subject_data = {
         "011 - CIVICS": [(f"S5788-{i:04d}", f"STUDENT {i} CIVIC", "F" if i % 2 == 0 else "M") for i in range(1, 134)],
         "012 - HISTORY": [(f"S5788-{i+100:04d}", f"STUDENT {i} HIST", "M" if i % 2 == 0 else "F") for i in range(1, 187)]
     }
-    # print(subject_data)
 
     school_info = {
         "ministry": "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
@@ -278,7 +294,6 @@ async def example_fastapi_usage():
         "report_name": "INDIVIDUAL ATTENDANCE"
     }
 
-    # Generate PDF (async)
     pdf_path = await pdf_gen.generate_pdf(
         school_info=school_info,
         subjects_data=subject_data,

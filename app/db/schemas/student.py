@@ -2,7 +2,7 @@
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from app.db.models.student import Sex
+
 
 class StudentBase(BaseModel):
     student_global_id: str
@@ -12,7 +12,7 @@ class StudentBase(BaseModel):
     first_name: str
     middle_name: Optional[str]=None
     surname: str
-    sex: Sex
+    sex: str
     created_at: datetime
 
 class StudentCreate(BaseModel):
@@ -22,7 +22,7 @@ class StudentCreate(BaseModel):
     first_name: str
     middle_name: Optional[str]=None
     surname: str
-    sex: Sex
+    sex: str
 
 class Student(StudentBase):
     model_config = ConfigDict(from_attributes=True)

@@ -1,22 +1,8 @@
 
-from sqlalchemy import Column, String, ForeignKey, Date, Enum
+from sqlalchemy import CheckConstraint, Column, String, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 from uuid6 import uuid6
-import enum
-
-class AvgStyle(str, enum.Enum):
-    AUTO = "AUTO"
-    SEVEN_BEST = "SEVEN_BEST"
-    EIGHT_BEST = "EIGHT_BEST"
-
-class ExamLevel(str, enum.Enum):
-    STNA = "STNA"
-    SFNA = "SFNA"
-    PSLE = "PSLE"
-    FTNA = "FTNA"
-    CSEE = "CSEE"
-    ACSEE = "ACSEE"
 
 class Exam(Base):
     __tablename__ = "exams"
@@ -26,8 +12,8 @@ class Exam(Base):
     exam_name_swahili = Column(String(100))
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    avg_style = Column(Enum(AvgStyle), nullable=False)  # MySQL: Native ENUM
-    exam_level = Column(Enum(ExamLevel), nullable=False)  # MySQL: Native ENUM
+    avg_style = Column(String(20), nullable=False) 
+    exam_level = Column(String(20), nullable=False)  
     board = relationship("ExamBoard", back_populates="exams")
     exam_subjects = relationship("ExamSubject", back_populates="exam")
     exam_divisions = relationship("ExamDivision", back_populates="exam")
@@ -35,3 +21,14 @@ class Exam(Base):
     students = relationship("Student", back_populates="exam")
     results = relationship("Result", back_populates="exam")
     user_exams = relationship("UserExam", back_populates="exam")
+
+    __table_args__ = (
+        CheckConstraint(
+            "avg_style IN ('AUTO', 'SEVEN_BEST', 'EIGHT_BEST')", 
+            name="valid_avg_style"
+        ),
+        CheckConstraint(
+            "exam_level IN ('STNA', 'SFNA', 'PSLE', 'FTNA', 'CSEE', 'ACSEE')", 
+            name="valid_exam_level"
+        ),
+    )

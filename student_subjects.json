@@ -1,0 +1,983 @@
+{
+  "011 - CIVICS": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "012 - HISTORY": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "013 - GEOGRAPHY": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "021 - KISWAHILI": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "022 - ENGLISH LANGUAGE": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "033/1 - BIOLOGY": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "033/2 - BIOLOGY (PRACTICAL)": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "041 - BASIC MATHEMATICS": [
+    [
+      "S0477-0001",
+      "ANGEL HERODE NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0003",
+      "ELIZABETH NESTORY LAURENT",
+      "F"
+    ],
+    [
+      "S0477-0004",
+      "MEVIS LUSUBILO KALINGA",
+      "F"
+    ],
+    [
+      "S0477-0005",
+      "NEEMA RICHARD KUYOKWA",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0007",
+      "SOFE FAIDA NGOGO",
+      "F"
+    ],
+    [
+      "S0477-0008",
+      "ABRAHAMU ESAU MENGO",
+      "M"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0013",
+      "EFRONI ANODI NGOGO",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0015",
+      "GWAMAKA MILTON KONGA",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0017",
+      "HERI RICHARD PHILIPO",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0020",
+      "OMARY HASSAN NGINGO",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ],
+  "031/1 - PHYSICS": [
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ]
+  ],
+  "031/2 - PHYSICS (PRACTICAL)": [
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ]
+  ],
+  "032/1 - CHEMISTRY": [
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ]
+  ],
+  "032/2 - CHEMISTRY (PRACTICAL)": [
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ]
+  ],
+  "024 - LITERATURE IN ENGLISH": [
+    [
+      "S0477-0002",
+      "DORCAS LANIWELO NJEJE",
+      "F"
+    ],
+    [
+      "S0477-0006",
+      "NOELA JOSEPH CHAWINGA",
+      "F"
+    ],
+    [
+      "S0477-0009",
+      "ADILI SADI MWANALUHANGA",
+      "M"
+    ],
+    [
+      "S0477-0010",
+      "ADOLPH LUSEKELO MWALWEBE",
+      "M"
+    ],
+    [
+      "S0477-0011",
+      "DANFORD KELVIN MAHENGE",
+      "M"
+    ],
+    [
+      "S0477-0012",
+      "DASTAN MASHAKA MWAMBANDE",
+      "M"
+    ],
+    [
+      "S0477-0014",
+      "ENOCK LUIS YORUM",
+      "M"
+    ],
+    [
+      "S0477-0016",
+      "HAMISI SAID MTAMBALIKE",
+      "M"
+    ],
+    [
+      "S0477-0018",
+      "ISAYA WILLIAM MWASONGA",
+      "M"
+    ],
+    [
+      "S0477-0019",
+      "MESHACK PETRO KOMBA",
+      "M"
+    ],
+    [
+      "S0477-0021",
+      "YUSUPH MALIK TWEVE",
+      "M"
+    ]
+  ]
+}
