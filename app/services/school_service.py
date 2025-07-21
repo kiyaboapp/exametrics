@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import text
 from fastapi import HTTPException
 from app.db.models.school import School as SchoolModel
 from app.db.models.subject import Subject
@@ -292,7 +293,6 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
         existing_students[(row.student_id, row.centre_number)] = row.student_global_id
     
     students_to_add = []
-    student_subjects_to_add = []
     student_global_ids = {}
     
     for _, row in students_df.iterrows():
@@ -327,17 +327,37 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
             )
             student_global_ids[(student_id, centre_number)] = student_global_id
         else:
-            logging.info(f"Skipping duplicate student: {student_id} in centre {centre_number}")
+            logging.info(f"Skipping duplicate student in pre-check: {student_id} in centre {centre_number}")
             student_global_ids[(student_id, centre_number)] = existing_students[(student_id, centre_number)]
     
     if students_to_add:
-        db.add_all(students_to_add)
-        try:
-            await db.commit()
-        except Exception as e:
-            logging.error(f"Failed to insert students: {str(e)}")
-            raise
-    
+        student_params = [
+            {
+                "student_global_id": s.student_global_id,
+                "exam_id": s.exam_id,
+                "student_id": s.student_id,
+                "centre_number": s.centre_number,
+                "first_name": s.first_name,
+                "middle_name": s.middle_name,
+                "surname": s.surname,
+                "sex": s.sex
+            }
+            for s in students_to_add
+        ]
+        result = await db.execute(
+            text("""
+                INSERT IGNORE INTO students
+                (student_global_id, exam_id, student_id, centre_number, first_name, middle_name, surname, sex)
+                VALUES (:student_global_id, :exam_id, :student_id, :centre_number, :first_name, :middle_name, :surname, :sex)
+            """),
+            student_params
+        )
+        await db.commit()
+        inserted_rows = result.rowcount
+        expected_rows = len(students_to_add)
+        if inserted_rows < expected_rows:
+            logging.info(f"Skipped {expected_rows - inserted_rows} duplicate students during bulk insert")
+
     existing_student_subjects = set()
     result = await db.execute(
         select(StudentSubject.student_global_id, StudentSubject.subject_code)
@@ -346,6 +366,7 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
     for row in result.fetchall():
         existing_student_subjects.add((row.student_global_id, row.subject_code))
     
+    student_subjects_to_add = []
     for _, row in students_df.iterrows():
         student_id = row['CANDIDATE']
         centre_number = row['CENTRE_NUMBER']
@@ -364,9 +385,26 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
                     )
     
     if student_subjects_to_add:
-        db.add_all(student_subjects_to_add)
-        try:
-            await db.commit()
-        except Exception as e:
-            logging.error(f"Failed to insert student subjects: {str(e)}")
-            raise
+        student_subject_params = [
+            {
+                "id": s.id,
+                "exam_id": s.exam_id,
+                "student_global_id": s.student_global_id,
+                "centre_number": s.centre_number,
+                "subject_code": s.subject_code
+            }
+            for s in student_subjects_to_add
+        ]
+        result = await db.execute(
+            text("""
+                INSERT IGNORE INTO student_subjects
+                (id, exam_id, student_global_id, centre_number, subject_code)
+                VALUES (:id, :exam_id, :student_global_id, :centre_number, :subject_code)
+            """),
+            student_subject_params
+        )
+        await db.commit()
+        inserted_rows = result.rowcount
+        expected_rows = len(student_subjects_to_add)
+        if inserted_rows < expected_rows:
+            logging.info(f"Skipped {expected_rows - inserted_rows} duplicate student subjects during bulk insert")
