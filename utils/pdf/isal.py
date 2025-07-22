@@ -11,6 +11,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
 
+
 UPLOAD_DIR = "uploads/download"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -183,7 +184,7 @@ class _AttendancePDFGeneratorInternal:
         ]
         if self.include_score and score is not None:
             row.append(score)
-        return "|" + "|".joint(row) + "|"
+        return "|" + "|".join(row) + "|"
 
     def _draw_page_header(self, c, y, headers, widths, subject_name):
         c.setFont(DEFAULT_FONT, 11)
@@ -222,8 +223,10 @@ class _AttendancePDFGeneratorInternal:
             "I declare that I have personally marked this attendance list and",
             "certify that the ticks (✓) and crosses (✗) are correctly entered.",
             "",
-            "______________________________                         ____________________",
-            "Name and Signature of supervisor           " + " " * 25 + "Date."
+            # "______________________________                         ____________________",
+            # "Name and Signature of supervisor           " + " " * 23 + "Date"
+            "________________________________       __________________      ______________",
+            "Name and Signature of supervisor           Mobile No.                 Date   "
         ]
         c.setFont(DEFAULT_FONT, 10)
         for i, line in enumerate(lines):
@@ -282,6 +285,7 @@ class _AttendancePDFGeneratorInternal:
 async def example_fastapi_usage():
     pdf_gen = AsyncAttendancePDFGenerator()
     
+
     subject_data = {
         "011 - CIVICS": [(f"S5788-{i:04d}", f"STUDENT {i} CIVIC", "F" if i % 2 == 0 else "M") for i in range(1, 134)],
         "012 - HISTORY": [(f"S5788-{i+100:04d}", f"STUDENT {i} HIST", "M" if i % 2 == 0 else "F") for i in range(1, 187)]

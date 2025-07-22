@@ -1,24 +1,27 @@
-
-import asyncio
-import json
 from typing import Dict, List, Tuple
 from sqlalchemy import select
-from app.db.database import AsyncSession, get_db, init_db
-from app.db.models import StudentSubject, ExamSubject, Student
+from app.db.database import AsyncSession
+from app.db.models import StudentSubject, ExamSubject, Student, Exam, School
 
 async def get_student_subjects_by_centre_and_exam(
     db: AsyncSession, 
     centre_number: str, 
-    exam_id: str
-) -> Dict[str, List[Tuple[str, str, str]]]:
+    exam_id: str,
+    ministry: str = "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
+    report_name: str = "INDIVIDUAL ATTENDANCE LIST"
+) -> tuple[Dict[str, List[Tuple[str, str, str]]], dict]:
     """
-    Returns a dictionary mapping subject codes to lists of student data tuples.
+    Returns a tuple containing:
+    1. Dictionary mapping subject codes to lists of student data tuples.
+    2. School info dictionary with ministry, exam board, school name, and report name.
     Splits subjects with has_practical=True into theory (code/1) and practical (code/2).
     """
     result = {}
+    school_info = {}
     
     try:
-        stmt = (
+        # Query for student subjects
+        stmt_subjects = (
             select(
                 StudentSubject.subject_code,
                 ExamSubject.subject_name,
@@ -36,11 +39,29 @@ async def get_student_subjects_by_centre_and_exam(
             )
         )
 
-        result_proxy = await db.execute(stmt)
-        rows = result_proxy.all()
+        # Query for school info
+        stmt_school = (
+            select(
+                Exam.exam_name,
+                School.school_name,
+                School.council_name,
+                School.region_name
+            )
+            .join(School, School.centre_number == centre_number)
+            .where(
+                School.centre_number == centre_number,
+                Exam.exam_id == exam_id
+            )
+        )
+
+        # Execute queries
+        result_proxy_subjects = await db.execute(stmt_subjects)
+        result_proxy_school = await db.execute(stmt_school)
         
+        # Process subject data
+        rows = result_proxy_subjects.all()
         if not rows:
-            return result
+            return result, school_info
             
         for row in rows:
             try:
@@ -63,43 +84,20 @@ async def get_student_subjects_by_centre_and_exam(
                     
             except Exception as row_error:
                 continue
+
+        # Process school info
+        school_row = result_proxy_school.first()
+        if school_row:
+            school_info = {
+                "ministry": ministry.upper(),
+                "exam_board": school_row.exam_name.upper(),
+                "school_name": f"EXAMINATION CENTRE:{centre_number} - {school_row.school_name.upper()} ({school_row.council_name.upper()}, {school_row.region_name.upper()})",
+                "report_name": report_name.upper()
+            }
                 
     except Exception as e:
         raise
         
-    return result
+    return result, school_info
 
-async def main():
-    await init_db()
-    
-    exam_id = "1f0656e3-8756-680b-ac24-8d5b3e217521"
-    centre_number = "S0477"
-    
-    try:
-        db_gen = get_db()
-        db = await db_gen.__anext__()
-        
-        try:
-            result = await get_student_subjects_by_centre_and_exam(
-                db, 
-                centre_number=centre_number,
-                exam_id=exam_id
-            )
-            # print(result)
-            
-            with open("student_subjects.json", "w") as f:
-                json.dump(result, f, indent=2)
-                
-        except Exception as e:
-            with open("student_subjects.json", "w") as f:
-                json.dump({"error": str(e)}, f)
-        finally:
-            await db.close()
-    except Exception as e:
-        with open("student_subjects.json", "w") as f:
-            json.dump({"error": str(e)}, f)
-    finally:
-        await db_gen.aclose()
 
-if __name__ == "__main__":
-    asyncio.run(main())
