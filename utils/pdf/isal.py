@@ -10,12 +10,15 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
-
+import zipfile
+from sqlalchemy import select
+from app.db.database import AsyncSession
+from app.db.models import StudentSubject, ExamSubject, Student, Exam, School
 
 UPLOAD_DIR = "uploads/download"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Thread-safe font registration (done once at module level)
+# Thread-safe font registration
 _fonts_initialized = False
 
 def initialize_fonts():
@@ -42,6 +45,103 @@ StudentRecord = Tuple[str, str, str]
 SubjectData = Dict[str, List[StudentRecord]]
 SchoolInfo = Dict[str, str]
 
+async def get_student_subjects_by_centre_and_exam(
+    db: AsyncSession, 
+    centre_number: str, 
+    exam_id: str,
+    ministry: str = "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
+    report_name: str = "INDIVIDUAL ATTENDANCE LIST",
+    subject_filter: str = "All"
+) -> tuple[Dict[str, List[Tuple[str, str, str]]], dict]:
+    result = {}
+    school_info = {}
+    
+    try:
+        stmt_subjects = (
+            select(
+                StudentSubject.subject_code,
+                ExamSubject.subject_name,
+                ExamSubject.has_practical,
+                Student.student_id,
+                Student.full_name,
+                Student.sex
+            )
+            .join(ExamSubject, StudentSubject.subject_code == ExamSubject.subject_code)
+            .join(Student, StudentSubject.student_global_id == Student.student_global_id)
+            .where(
+                StudentSubject.centre_number == centre_number,
+                StudentSubject.exam_id == exam_id,
+                ExamSubject.exam_id == exam_id
+            )
+        )
+
+        stmt_school = (
+            select(
+                Exam.exam_name,
+                School.school_name,
+                School.council_name,
+                School.region_name
+            )
+            .join(School, School.centre_number == centre_number)
+            .where(
+                School.centre_number == centre_number,
+                Exam.exam_id == exam_id
+            )
+        )
+
+        result_proxy_subjects = await db.execute(stmt_subjects)
+        result_proxy_school = await db.execute(stmt_school)
+        
+        rows = result_proxy_subjects.all()
+        if not rows:
+            return result, school_info
+            
+        for row in rows:
+            try:
+                subject_code = row.subject_code
+                subject_name = row.subject_name.upper()
+                has_practical = row.has_practical
+                
+                if subject_filter == "PracticalOnly":
+                    if has_practical:
+                        practical_key = f"{subject_code}/2 - {subject_name} (PRACTICAL)"
+                        practical_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(practical_key, []).append(practical_data)
+                elif subject_filter == "TheoryOnly":
+                    key = f"{subject_code} - {subject_name}"
+                    student_data = (row.student_id, row.full_name, row.sex)
+                    result.setdefault(key, []).append(student_data)
+                else:  # All
+                    if has_practical:
+                        theory_key = f"{subject_code}/1 - {subject_name}"
+                        theory_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(theory_key, []).append(theory_data)
+                        
+                        practical_key = f"{subject_code}/2 - {subject_name} (PRACTICAL)"
+                        practical_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(practical_key, []).append(practical_data)
+                    else:
+                        key = f"{subject_code} - {subject_name}"
+                        student_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(key, []).append(student_data)
+                    
+            except Exception as row_error:
+                continue
+
+        school_row = result_proxy_school.first()
+        if school_row:
+            school_info = {
+                "ministry": ministry.upper(),
+                "exam_board": school_row.exam_name.upper(),
+                "school_name": f"EXAMINATION CENTRE:{centre_number} - {school_row.school_name.upper()} ({school_row.council_name.upper()}, {school_row.region_name.upper()})",
+                "report_name": report_name.upper()
+            }
+                
+    except Exception as e:
+        raise
+        
+    return result, school_info
+
 class AsyncAttendancePDFGenerator:
     """Thread-safe async wrapper for PDF generation"""
     _executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
@@ -51,66 +151,110 @@ class AsyncAttendancePDFGenerator:
     
     async def generate_pdf(
         self,
-        school_info: SchoolInfo,
-        subjects_data: SubjectData,
+        db: AsyncSession,
+        exam_id: str,
+        centre_number: str = None,
+        region_name: str = None,
+        council_name: str = None,
+        exam_year: int = None,
+        exam_level: str = None,
+        output_dir: str = None,
+        output_filename: str = None,
         include_score: bool = True,
         underscore_mode: bool = True,
-        separate_every: int = 10
+        separate_every: int = 10,
+        ministry: str = "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
+        report_name: str = "INDIVIDUAL ATTENDANCE LIST",
+        subject_filter: str = "All"
     ) -> str:
         """
-        Generate PDF asynchronously with thread-safe handling
-        Returns path to generated PDF file
+        Generate PDF(s) asynchronously with thread-safe handling
+        Returns path to generated PDF file or ZIP file if multiple PDFs
         """
-        output_filename = f"ISAL-BY-KIYABO-APP-{uuid.uuid4().hex}.pdf"
-        output_path = os.path.join(UPLOAD_DIR, output_filename)
+        output_dir = output_dir or self.temp_dir
+        os.makedirs(output_dir, exist_ok=True)
+
+        if centre_number:
+            subjects_data, school_info = await get_student_subjects_by_centre_and_exam(
+                db, centre_number, exam_id, ministry, report_name, subject_filter
+            )
+            if not subjects_data:
+                return ""
+                
+            output_filename = output_filename or f"{centre_number}-{exam_year or datetime.now().year}-{exam_level or 'FORM'}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+            output_path = os.path.join(output_dir, output_filename)
+            
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor,
+                self._generate_sync,
+                str(output_path),
+                school_info,
+                subjects_data,
+                include_score,
+                underscore_mode,
+                separate_every
+            )
+            return str(output_path)
         
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            self._executor,
-            self._generate_sync,
-            str(output_path),
-            school_info,
-            subjects_data,
-            include_score,
-            underscore_mode,
-            separate_every
-        )
-        
-        return str(output_path)
-    
-    async def generate_pdf_with_naming(
-        self,
-        school_info: SchoolInfo,
-        subjects_data: SubjectData,
-        centre_number: str,
-        exam_year: int,
-        exam_level: str,
-        output_dir: str,
-        include_score: bool = True,
-        underscore_mode: bool = True,
-        separate_every: int = 10
-    ) -> str:
-        """
-        Generate PDF with custom naming convention and output directory
-        Returns path to generated PDF file
-        """
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        output_filename = f"{centre_number}-{exam_year}-{exam_level}-{timestamp}.pdf"
-        output_path = os.path.join(output_dir, output_filename)
-        
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            self._executor,
-            self._generate_sync,
-            str(output_path),
-            school_info,
-            subjects_data,
-            include_score,
-            underscore_mode,
-            separate_every
-        )
-        
-        return str(output_path)
+        else:
+            # Query schools based on region_name and/or council_name
+            stmt_schools = select(School.centre_number, School.school_name, School.council_name, School.region_name)
+            if region_name and council_name:
+                stmt_schools = stmt_schools.where(
+                    School.region_name.ilike(f"%{region_name}%"),
+                    School.council_name.ilike(f"%{council_name}%")
+                )
+            elif region_name:
+                stmt_schools = stmt_schools.where(School.region_name.ilike(f"%{region_name}%"))
+            elif council_name:
+                stmt_schools = stmt_schools.where(School.council_name.ilike(f"%{council_name}%"))
+            
+            result = await db.execute(stmt_schools)
+            schools = result.all()
+            
+            if not schools:
+                return ""
+                
+            pdf_paths = []
+            zip_filename = f"attendance_reports_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
+            zip_path = os.path.join(output_dir, zip_filename)
+            
+            for school in schools:
+                centre_number = school.centre_number
+                print(f"    => {school.centre_number}: {school.school_name}")
+                subjects_data, school_info = await get_student_subjects_by_centre_and_exam(
+                    db, centre_number, exam_id, ministry, report_name, subject_filter
+                )
+                if not subjects_data:
+                    continue
+                    
+                pdf_filename = f"{centre_number}-{exam_year or datetime.now().year}-{exam_level or 'FORM'}-{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+                pdf_path = os.path.join(output_dir, pdf_filename)
+                
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(
+                    self._executor,
+                    self._generate_sync,
+                    str(pdf_path),
+                    school_info,
+                    subjects_data,
+                    include_score,
+                    underscore_mode,
+                    separate_every
+                )
+                pdf_paths.append(pdf_path)
+            
+            if len(pdf_paths) == 1:
+                return pdf_paths[0]
+                
+            # Create ZIP file
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for pdf_path in pdf_paths:
+                    zipf.write(pdf_path, os.path.basename(pdf_path))
+                    os.remove(pdf_path)  # Clean up individual PDFs
+            
+            return str(zip_path)
     
     @staticmethod
     def _generate_sync(
@@ -133,10 +277,6 @@ class AsyncAttendancePDFGenerator:
         generator.generate()
 
 class _AttendancePDFGeneratorInternal:
-    """
-    Internal synchronous PDF generator
-    Maintains all original logic exactly as provided
-    """
     def __init__(
         self,
         filename: str,
@@ -152,7 +292,6 @@ class _AttendancePDFGeneratorInternal:
         self.include_score = include_score
         self.underscore_mode = underscore_mode
         self.separate_every = separate_every
-
         self.page_width, self.page_height = A4
         self.x_margin = 20 * mm
         self.y_start = 275 * mm
@@ -197,7 +336,6 @@ class _AttendancePDFGeneratorInternal:
         y -= 6 * mm
         c.drawCentredString(self.page_width / 2, y, f"{self.school_info['report_name']} FOR SUBJECT: {subject_name}")
         y -= 8 * mm
-
         c.setFont(DEFAULT_FONT, 8)
         c.drawString(self.x_margin, y, self._make_border(widths))
         y -= 3.5 * mm
@@ -223,8 +361,6 @@ class _AttendancePDFGeneratorInternal:
             "I declare that I have personally marked this attendance list and",
             "certify that the ticks (✓) and crosses (✗) are correctly entered.",
             "",
-            # "______________________________                         ____________________",
-            # "Name and Signature of supervisor           " + " " * 23 + "Date"
             "________________________________       __________________      ______________",
             "Name and Signature of supervisor           Mobile No.                 Date   "
         ]
@@ -250,7 +386,6 @@ class _AttendancePDFGeneratorInternal:
 
         c = canvas.Canvas(self.filename, pagesize=A4)
         global_page = 1
-
         total_pages = 0
         for students in self.subjects_data.values():
             total_students = len(students)
@@ -280,33 +415,3 @@ class _AttendancePDFGeneratorInternal:
                 c.showPage()
 
         c.save()
-
-# Example usage in FastAPI route
-async def example_fastapi_usage():
-    pdf_gen = AsyncAttendancePDFGenerator()
-    
-
-    subject_data = {
-        "011 - CIVICS": [(f"S5788-{i:04d}", f"STUDENT {i} CIVIC", "F" if i % 2 == 0 else "M") for i in range(1, 134)],
-        "012 - HISTORY": [(f"S5788-{i+100:04d}", f"STUDENT {i} HIST", "M" if i % 2 == 0 else "F") for i in range(1, 187)]
-    }
-
-    school_info = {
-        "ministry": "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
-        "exam_board": "LAKE ZONE FORM IV MOCK EXAMINATION, JULY 2025",
-        "school_name": "EXAMINATION CENTRE: S5788 - BUKOKWA SS (BUCHOSA, MWANZA)",
-        "report_name": "INDIVIDUAL ATTENDANCE"
-    }
-
-    pdf_path = await pdf_gen.generate_pdf(
-        school_info=school_info,
-        subjects_data=subject_data,
-        include_score=True,
-        underscore_mode=True,
-        separate_every=10
-    )
-    
-    print(f"Generated PDF at: {pdf_path}")
-
-if __name__ == "__main__":
-    asyncio.run(example_fastapi_usage())
