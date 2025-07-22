@@ -6,11 +6,6 @@ import aiomysql
 from dotenv import load_dotenv
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
-from sqlalchemy import select, and_, func
-from app.db.models import School, Ward, Council, Region, StudentSubject, ExamSubject, Student
-from app.db.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # Load environment variables
 if not os.path.exists('.env'):
@@ -35,7 +30,7 @@ DB_CONFIG = {
 }
 
 async def get_excel_workbook_name(
-    ward_id: int = 0,
+    ward_name: str = "",
     council_name: str = "",
     region_name: str = "",
     school_type: str = "",
@@ -45,41 +40,15 @@ async def get_excel_workbook_name(
     separator = "_"
     result = []
     
-    # Query ward_name from wards table if ward_id is provided
-    ward_name = ""
-    if ward_id:
-        pool = None
-        conn = None
-        cursor = None
-        try:
-            pool = await aiomysql.create_pool(**DB_CONFIG)
-            conn = await pool.acquire()
-            cursor = await conn.cursor(aiomysql.DictCursor)
-            await cursor.execute("SELECT ward_name FROM wards WHERE ward_id = %s", (ward_id,))
-            result = await cursor.fetchone()
-            ward_name = result['ward_name'] if result and result['ward_name'] else ""
-            logger.debug(f"Queried ward_name='{ward_name}' for ward_id={ward_id}")
-        except aiomysql.Error as e:
-            logger.error(f"Error querying ward_name for ward_id={ward_id}: {e}")
-            ward_name = ""
-        finally:
-            if cursor:
-                await cursor.close()
-            if conn and pool:
-                pool.release(conn)
-            if pool:
-                pool.close()
-                await pool.wait_closed()
-    
     # Build base name from non-empty parameters
     if ward_name:
-        result.append(ward_name)
+        result.append(ward_name.replace(" ", "_"))
     if council_name:
-        result.append(council_name)
+        result.append(council_name.replace(" ", "_"))
     if region_name:
-        result.append(region_name)
+        result.append(region_name.replace(" ", "_"))
     if school_type:
-        result.append(school_type)
+        result.append(school_type.replace(" ", "_"))
     
     # Handle practical mode
     if practical_mode != 0:
@@ -100,7 +69,7 @@ async def get_excel_workbook_name(
 
 async def export_to_excel(
     exam_id: str,
-    ward_id: int = 0,
+    ward_name: str = "",
     council_name: str = "",
     region_name: str = "",
     school_type: str = "",
@@ -111,16 +80,14 @@ async def export_to_excel(
     conn = None
     cursor = None
     
-    # Initialize connection pool outside try
-    pool = await aiomysql.create_pool(**DB_CONFIG)
-    
     try:
+        pool = await aiomysql.create_pool(**DB_CONFIG)
         conn = await pool.acquire()
         cursor = await conn.cursor(aiomysql.DictCursor)
         
         # Debug: Check data existence
         await cursor.execute(
-            "SELECT COUNT(*) AS count FROM exam_subjects WHERE exam_id = %s AND is_present = TRUE",
+            "SELECT COUNT(*) AS count FROM exam_subjects WHERE exam_id = %s",
             (exam_id,)
         )
         exam_subjects_count = (await cursor.fetchone())['count']
@@ -134,44 +101,41 @@ async def export_to_excel(
         logger.info(f"Found {student_subjects_count} student-subject mappings for exam_id={exam_id}")
         
         # Build WHERE clause with parameterized query
-        where_clause = "WHERE exam_subjects.is_present = TRUE AND exam_subjects.exam_id = %s"
+        where_clause = "WHERE es.exam_id = %s"
         params = [exam_id]
         location_filter = []
-        if ward_id:
-            location_filter.append("schools.ward_id = %s")
-            params.append(ward_id)
+        if ward_name:
+            location_filter.append("s.ward_name = %s")
+            params.append(ward_name)
         if council_name:
-            location_filter.append("schools.council_name = %s")
+            location_filter.append("s.council_name = %s")
             params.append(council_name)
         if region_name:
-            location_filter.append("schools.region_name = %s")
+            location_filter.append("s.region_name = %s")
             params.append(region_name)
         if school_type:
-            location_filter.append("schools.school_type = %s")
+            location_filter.append("s.school_type = %s")
             params.append(school_type)
         
         if location_filter:
             where_clause += " AND " + " AND ".join(location_filter)
         
         if practical_mode == 2:  # ExportOnlyPracticalVersions
-            where_clause += " AND exam_subjects.has_practical = TRUE"
+            where_clause += " AND es.has_practical = TRUE"
         
-        # SQL query with LEFT JOIN for wards
+        # SQL query with INNER JOINs
         sql = f"""
-        SELECT students.student_id, students.full_name, students.sex,
-               exam_subjects.subject_code, exam_subjects.subject_name, exam_subjects.subject_short,
-               school_info.centre_number, schools.school_name,
-               wards.ward_name, schools.council_name, schools.region_name,
-               schools.school_type, exam_subjects.has_practical
-        FROM schools
-        LEFT JOIN wards ON schools.ward_id = wards.ward_id
-        INNER JOIN students ON schools.centre_number = students.centre_number
-        INNER JOIN (exam_subjects INNER JOIN student_subjects
-                    ON exam_subjects.subject_code = student_subjects.subject_code
-                    AND exam_subjects.exam_id = student_subjects.exam_id)
-        ON students.student_id = student_subjects.student_id
+        SELECT st.student_id, st.student_global_id, st.full_name, st.sex,
+               es.subject_code, es.subject_name, es.subject_short,
+               s.centre_number, s.school_name,
+               s.ward_name, s.council_name, s.region_name,
+               s.school_type, es.has_practical
+        FROM schools s
+        INNER JOIN students st ON s.centre_number = st.centre_number
+        INNER JOIN student_subjects ss ON st.student_global_id = ss.student_global_id AND st.exam_id = ss.exam_id
+        INNER JOIN exam_subjects es ON ss.exam_id = es.exam_id AND ss.subject_code = es.subject_code
         {where_clause}
-        ORDER BY students.student_id ASC, exam_subjects.subject_code ASC
+        ORDER BY st.student_id ASC, es.subject_code ASC
         """
         
         await cursor.execute(sql, params)
@@ -179,8 +143,8 @@ async def export_to_excel(
         
         # Error message for empty result
         msg = "NO STUDENT REGISTERED FOR THIS CONDITION!"
-        if ward_id:
-            msg += f" WARD_ID={ward_id}"
+        if ward_name:
+            msg += f" WARD_NAME={ward_name}"
         if council_name:
             msg += f" COUNCIL={council_name}"
         if region_name:
@@ -208,11 +172,12 @@ async def export_to_excel(
                 f"{record['ward_name'] or ''}|{record['council_name'] or ''}|"
                 f"{record['region_name'] or ''}|{record['school_type'] or ''}"
             )
+            logger.info(school_key)
             
             if practical_mode != 2:  # Not ExportOnlyPracticalVersions
                 # Add theory row
                 data_array.append([
-                    record['student_id'] or '',
+                    record['student_id'] or '',  # Use student_id for readability
                     record['full_name'] or '',
                     record['sex'] or '',
                     '',  # Empty marks column
@@ -224,7 +189,8 @@ async def export_to_excel(
                     record['ward_name'] or '',
                     record['council_name'] or '',
                     record['region_name'] or '',
-                    exam_id  # New exam_id column
+                    exam_id,
+                    record['student_global_id'] or ''  # Add student_global_id in column N
                 ])
                 
                 subj_key = (
@@ -254,7 +220,7 @@ async def export_to_excel(
             if record['has_practical'] and practical_mode != 1:  # Not ExportWithoutPractical
                 # Add practical row
                 data_array.append([
-                    record['student_id'] or '',
+                    record['student_id'] or '',  # Use student_id for readability
                     record['full_name'] or '',
                     record['sex'] or '',
                     '',  # Empty marks column
@@ -266,7 +232,8 @@ async def export_to_excel(
                     record['ward_name'] or '',
                     record['council_name'] or '',
                     record['region_name'] or '',
-                    exam_id  # New exam_id column
+                    exam_id,
+                    record['student_global_id'] or ''  # Add student_global_id in column N
                 ])
                 
                 prac_subj_key = (
@@ -303,10 +270,9 @@ async def export_to_excel(
         os.makedirs("./output", exist_ok=True)
         save_path = os.path.join(
             "./output",
-            f"{await get_excel_workbook_name(ward_id, council_name, region_name, school_type, practical_mode)}.xlsm"
+            f"{await get_excel_workbook_name(ward_name, council_name, region_name, school_type, practical_mode)}.xlsm"
         )
         
-        # Ensure exclusive file access
         shutil.copyfile(original_file, save_path)
         
         # Open Excel workbook
@@ -319,9 +285,6 @@ async def export_to_excel(
         # Clear Interface!A500
         interface_sheet["A500"] = ""
         
-        # Skip clearing Table1, Subjects, and Schools (assume template is empty)
-        table1 = students_sheet.tables.get("Table1")
-        
         # Set number formats
         students_sheet.column_dimensions["E"].number_format = "@"
         subjects_sheet.column_dimensions["A"].number_format = "@"
@@ -331,12 +294,14 @@ async def export_to_excel(
             for i, row in enumerate(data_array, start=2):
                 for j, value in enumerate(row, start=1):
                     students_sheet.cell(row=i, column=j).value = value
+            table1 = students_sheet.tables.get("Table1")
             if table1:
-                table1.ref = f"A1:M{len(data_array) + 1}"
+                table1.ref = f"A1:N{len(data_array) + 1}"  # Updated to include column N
         else:
-            students_sheet["A2:M2"] = [""] * 13
+            students_sheet["A2:N2"] = [""] * 14  # Updated to include column N
+            table1 = students_sheet.tables.get("Table1")
             if table1:
-                table1.ref = "A1:M2"
+                table1.ref = "A1:N2"
         
         # Write subjects data
         row_index = 2
@@ -383,7 +348,6 @@ async def export_to_excel(
         schools_sheet.column_dimensions["I"].number_format = "0.0%"
         
         # Create dropdowns in Interface sheet
-        # Dropdown for C5: centre_number from Schools (A2:A<last_row>)
         centre_numbers = [str(school_data[0]) for school_data in school_dict.values() if school_data[0]]
         if centre_numbers:
             dv_centre = DataValidation(type="list", formula1=f'"{",".join(centre_numbers)}"', allow_blank=True)
@@ -391,10 +355,9 @@ async def export_to_excel(
             interface_sheet.add_data_validation(dv_centre)
             logger.debug(f"Added dropdown to Interface!C5 with {len(centre_numbers)} centre numbers")
         
-        # Dropdown for C6: subject_code from Subjects (A2:A<last_row>)
         subject_codes = [str(subj_data[0]) for subj_data in subject_dict.values() if subj_data[0]]
         if subject_codes:
-            interface_sheet["C6"].number_format = "@"  # Ensure C6 is text format
+            interface_sheet["C6"].number_format = "@"
             dv_subject = DataValidation(type="list", formula1=f'"{",".join(subject_codes)}"', allow_blank=True)
             dv_subject.add("C6")
             interface_sheet.add_data_validation(dv_subject)
@@ -419,10 +382,8 @@ async def export_to_excel(
         if conn and pool:
             pool.release(conn)
         if pool:
-            pool.close()  
+            pool.close()
             await pool.wait_closed()
-
-
 
 async def import_marks_from_excel(file_path: str) -> int:
     """Read marks from an Excel file and update student_subjects table. Return number of updated records."""
@@ -449,34 +410,34 @@ async def import_marks_from_excel(file_path: str) -> int:
         
         # Verify existing records
         await cursor.execute(
-            "SELECT DISTINCT exam_id, student_id, subject_code FROM student_subjects WHERE exam_id = %s",
+            "SELECT DISTINCT exam_id, student_global_id, subject_code FROM student_subjects WHERE exam_id = %s",
             (students_sheet["M2"].value or "",)
         )
         existing_records = {(row[0], row[1], row[2]) for row in await cursor.fetchall()}
         
-        # Group marks by (exam_id, student_id, clean_subject_code)
+        # Group marks by (exam_id, student_global_id, clean_subject_code)
         marks_dict = {}
-        for row in students_sheet.iter_rows(min_row=2, max_col=13, values_only=True):
-            student_id = str(row[0] or "")
+        for row in students_sheet.iter_rows(min_row=2, max_col=14, values_only=True):  # Updated to include column N
+            student_global_id = str(row[13] or "")  # Use student_global_id from column N
             marks = row[3]
             subject_code = str(row[4] or "")
             exam_id = str(row[12] or "")
-            
-            if not all([exam_id, student_id, subject_code]):
-                logger.warning(f"Skipping row with missing data: exam_id={exam_id}, student_id={student_id}, subject_code={subject_code}")
+            logger.info(f"{student_global_id} -{subject_code}")
+            if not all([exam_id, student_global_id, subject_code]):
+                logger.warning(f"Skipping row with missing data: exam_id={exam_id}, student_global_id={student_global_id}, subject_code={subject_code}")
                 continue
             
             try:
                 marks_value = float(marks) if marks is not None else None
             except (ValueError, TypeError):
-                logger.warning(f"Invalid marks value '{marks}' for student_id={student_id}, subject_code={subject_code}")
+                logger.warning(f"Invalid marks value '{marks}' for student_global_id={student_global_id}, subject_code={subject_code}")
                 continue
             
             clean_subject_code = subject_code[:-2] if subject_code.endswith("-P") else subject_code
-            key = (exam_id, student_id, clean_subject_code)
+            key = (exam_id, student_global_id, clean_subject_code)
             
             if key not in existing_records:
-                logger.warning(f"No record found in database: exam_id={exam_id}, student_id={student_id}, subject_code={clean_subject_code}")
+                logger.warning(f"No record found in database: exam_id={exam_id}, student_global_id={student_global_id}, subject_code={clean_subject_code}")
                 continue
             
             if key not in marks_dict:
@@ -490,25 +451,25 @@ async def import_marks_from_excel(file_path: str) -> int:
         await conn.begin()
         
         updated_records = 0
-        for (exam_id, student_id, clean_subject_code), marks in marks_dict.items():
+        for (exam_id, student_global_id, clean_subject_code), marks in marks_dict.items():
             query = """
             UPDATE student_subjects
             SET theory_marks = %s, practical_marks = %s, submitted_by = %s
-            WHERE exam_id = %s AND student_id = %s AND subject_code = %s
+            WHERE exam_id = %s AND student_global_id = %s AND subject_code = %s
             """
             params = (
                 marks["theory_marks"],
                 marks["practical_marks"],
                 submitted_by,
                 exam_id,
-                student_id,
+                student_global_id,
                 clean_subject_code
             )
             
             await cursor.execute(query, params)
             if cursor.rowcount > 0:
                 updated_records += 1
-                logger.debug(f"Updated record: exam_id={exam_id}, student_id={student_id}, subject_code={clean_subject_code}, "
+                logger.debug(f"Updated record: exam_id={exam_id}, student_global_id={student_global_id}, subject_code={clean_subject_code}, "
                             f"theory_marks={marks['theory_marks']}, practical_marks={marks['practical_marks']}, submitted_by={submitted_by}")
         
         await conn.commit()
@@ -534,12 +495,11 @@ async def import_marks_from_excel(file_path: str) -> int:
         if conn and pool:
             pool.release(conn)
         if pool:
-            pool.close()  # <-- This is NOT awaitable
+            pool.close()
             await pool.wait_closed()
 
-
 async def calculate_marks_and_ranks(exam_id: str) -> int:
-    """Calculate overall_marks and integer rankings for student_subjects table, excluding invalid locations. Return number of updated records."""
+    """Calculate overall_marks and integer rankings for student_subjects table. Return number of updated records."""
     pool = None
     conn = None
     cursor = None
@@ -551,15 +511,15 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
         
         # Fetch student_subjects with has_practical and location info
         query = """
-        SELECT ss.exam_id, ss.student_id, ss.subject_code, 
+        SELECT ss.exam_id, ss.student_global_id, ss.subject_code, 
                ss.theory_marks, ss.practical_marks,
                es.has_practical,
-               si.ward_id, si.council_name, si.region_name, si.school_type
+               s.ward_name, s.council_name, s.region_name, s.school_type
         FROM student_subjects ss
         INNER JOIN exam_subjects es ON ss.exam_id = es.exam_id AND ss.subject_code = es.subject_code
-        INNER JOIN students s ON ss.student_id = s.student_id
-        INNER JOIN schools si ON s.centre_number = si.centre_number
-        WHERE ss.exam_id = %s
+        INNER JOIN students st ON ss.student_global_id = st.student_global_id AND ss.exam_id = st.exam_id
+        INNER JOIN schools s ON ss.centre_number = s.centre_number
+        WHERE ss.exam_id = %s AND (ss.theory_marks>=0 OR ss.practical_marks>=0)
         """
         await cursor.execute(query, (exam_id,))
         records = await cursor.fetchall()
@@ -567,57 +527,49 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
         if not records:
             logger.warning(f"No records found for exam_id={exam_id}")
             return 0
-        
+        logger.info(f"Found {len(records)} Entries in exam {exam_id}")
         # Calculate overall_marks and prepare for ranking
         records_with_marks = []
+        i=0
+        my_records=len(records)
         for record in records:
+            i=i+1
             overall_marks = None
             if record['has_practical']:
                 if record['theory_marks'] is not None and record['practical_marks'] is not None:
-                    overall_marks = (record['theory_marks'] + record['practical_marks']) / 2
+                    overall_marks = (record['theory_marks'] + record['practical_marks']) *2/ 3
                 elif record['theory_marks'] is not None:
-                    overall_marks = record['theory_marks'] / 2
+                    overall_marks = record['theory_marks'] *2/ 3
                 elif record['practical_marks'] is not None:
-                    overall_marks = record['practical_marks'] / 2
+                    overall_marks = record['practical_marks'] *2/ 3
             else:
                 overall_marks = record['theory_marks']
             
             records_with_marks.append({
                 'exam_id': record['exam_id'],
-                'student_id': record['student_id'],
+                'student_global_id': record['student_global_id'],
                 'subject_code': record['subject_code'],
                 'overall_marks': overall_marks,
-                'ward_id': record['ward_id'],
+                'ward_name': record['ward_name'],
                 'council_name': record['council_name'],
                 'region_name': record['region_name'],
                 'school_type': record['school_type'],
-                'subj_pos': None,
-                'subj_ward_pos': None,
-                'subj_council_pos': None,
-                'subj_region_pos': None,
-                'subj_ward_pos_gvt': None,
-                'subj_ward_pos_pvt': None,
-                'subj_ward_pos_unknown': None,
-                'subj_council_pos_gvt': None,
-                'subj_council_pos_pvt': None,
-                'subj_council_pos_unknown': None,
-                'subj_region_pos_gvt': None,
-                'subj_region_pos_pvt': None,
-                'subj_region_pos_unknown': None,
-                'subj_pos_out_of': None,
-                'subj_ward_pos_out_of': None,
-                'subj_council_pos_out_of': None,
-                'subj_region_pos_out_of': None,
-                'subj_ward_pos_gvt_out_of': None,
-                'subj_ward_pos_pvt_out_of': None,
-                'subj_ward_pos_unknown_out_of': None,
-                'subj_council_pos_gvt_out_of': None,
-                'subj_council_pos_pvt_out_of': None,
-                'subj_council_pos_unknown_out_of': None,
-                'subj_region_pos_gvt_out_of': None,
-                'subj_region_pos_pvt_out_of': None,
-                'subj_region_pos_unknown_out_of': None
+                'subject_pos': None,
+                'ward_subject_pos': None,
+                'council_subject_pos': None,
+                'region_subject_pos': None,
+                'ward_subject_pos_gvt': None,
+                'ward_subject_pos_pvt': None,
+                'council_subject_pos_gvt': None,
+                'council_subject_pos_pvt': None,
+                'region_subject_pos_gvt': None,
+                'region_subject_pos_pvt': None,
+                'subject_out_of': None,
+                'ward_subject_out_of': None,
+                'council_subject_out_of': None,
+                'region_subject_out_of': None
             })
+            logger.info(f"  Inserting {record['student_global_id']} - {record['subject_code']} - {record['theory_marks']} - {record['practical_marks']} | {i} out of {my_records}")
         
         # Compute dense rankings and out_of counts
         def compute_ranks(records, key_func, pos_field, out_of_field, valid_check=lambda r: True):
@@ -648,143 +600,109 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
                     rec[pos_field] = current_pos
                     rec[out_of_field] = total_ranked
         
-        # Overall position (subj_pos, no location check)
+        # Overall position
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'],), 
-                      'subj_pos', 
-                      'subj_pos_out_of')
+                      'subject_pos', 
+                      'subject_out_of')
         
-        # Ward positions (only if ward_id and school_type are not null)
+        # Ward positions
         compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['ward_id']), 
-                      'subj_ward_pos', 
-                      'subj_ward_pos_out_of', 
-                      lambda r: r['ward_id'] is not None and r['school_type'] is not None)
+                      lambda r: (r['subject_code'], r['ward_name']), 
+                      'ward_subject_pos', 
+                      'ward_subject_out_of', 
+                      lambda r: r['ward_name'] is not None and r['school_type'] is not None)
         compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['ward_id'], r['school_type'] if r['school_type'] == 'gvt' else None), 
-                      'subj_ward_pos_gvt', 
-                      'subj_ward_pos_gvt_out_of', 
-                      lambda r: r['ward_id'] is not None and r['school_type'] == 'gvt')
+                      lambda r: (r['subject_code'], r['ward_name'], r['school_type'] if r['school_type'] == 'gvt' else None), 
+                      'ward_subject_pos_gvt', 
+                      'ward_subject_out_of', 
+                      lambda r: r['ward_name'] is not None and r['school_type'] == 'gvt')
         compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['ward_id'], r['school_type'] if r['school_type'] == 'pvt' else None), 
-                      'subj_ward_pos_pvt', 
-                      'subj_ward_pos_pvt_out_of', 
-                      lambda r: r['ward_id'] is not None and r['school_type'] == 'pvt')
-        compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['ward_id'], r['school_type'] if r['school_type'] == 'unknown' else None), 
-                      'subj_ward_pos_unknown', 
-                      'subj_ward_pos_unknown_out_of', 
-                      lambda r: r['ward_id'] is not None and r['school_type'] == 'unknown')
+                      lambda r: (r['subject_code'], r['ward_name'], r['school_type'] if r['school_type'] == 'pvt' else None), 
+                      'ward_subject_pos_pvt', 
+                      'ward_subject_out_of', 
+                      lambda r: r['ward_name'] is not None and r['school_type'] == 'pvt')
         
-        # Council positions (only if council_name and school_type are not null)
+        # Council positions
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['council_name']), 
-                      'subj_council_pos', 
-                      'subj_council_pos_out_of', 
+                      'council_subject_pos', 
+                      'council_subject_out_of', 
                       lambda r: r['council_name'] is not None and r['school_type'] is not None)
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['council_name'], r['school_type'] if r['school_type'] == 'gvt' else None), 
-                      'subj_council_pos_gvt', 
-                      'subj_council_pos_gvt_out_of', 
+                      'council_subject_pos_gvt', 
+                      'council_subject_out_of', 
                       lambda r: r['council_name'] is not None and r['school_type'] == 'gvt')
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['council_name'], r['school_type'] if r['school_type'] == 'pvt' else None), 
-                      'subj_council_pos_pvt', 
-                      'subj_council_pos_pvt_out_of', 
+                      'council_subject_pos_pvt', 
+                      'council_subject_out_of', 
                       lambda r: r['council_name'] is not None and r['school_type'] == 'pvt')
-        compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['council_name'], r['school_type'] if r['school_type'] == 'unknown' else None), 
-                      'subj_council_pos_unknown', 
-                      'subj_council_pos_unknown_out_of', 
-                      lambda r: r['council_name'] is not None and r['school_type'] == 'unknown')
         
-        # Region positions (only if region_name and school_type are not null)
+        # Region positions
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['region_name']), 
-                      'subj_region_pos', 
-                      'subj_region_pos_out_of', 
+                      'region_subject_pos', 
+                      'region_subject_out_of', 
                       lambda r: r['region_name'] is not None and r['school_type'] is not None)
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['region_name'], r['school_type'] if r['school_type'] == 'gvt' else None), 
-                      'subj_region_pos_gvt', 
-                      'subj_region_pos_gvt_out_of', 
+                      'region_subject_pos_gvt', 
+                      'region_subject_out_of', 
                       lambda r: r['region_name'] is not None and r['school_type'] == 'gvt')
         compute_ranks(records_with_marks, 
                       lambda r: (r['subject_code'], r['region_name'], r['school_type'] if r['school_type'] == 'pvt' else None), 
-                      'subj_region_pos_pvt', 
-                      'subj_region_pos_pvt_out_of', 
+                      'region_subject_pos_pvt', 
+                      'region_subject_out_of', 
                       lambda r: r['region_name'] is not None and r['school_type'] == 'pvt')
-        compute_ranks(records_with_marks, 
-                      lambda r: (r['subject_code'], r['region_name'], r['school_type'] if r['school_type'] == 'unknown' else None), 
-                      'subj_region_pos_unknown', 
-                      'subj_region_pos_unknown_out_of', 
-                      lambda r: r['region_name'] is not None and r['school_type'] == 'unknown')
         
         # Update student_subjects table
+        logger.info(f"Starting Execution Preparation==========")
         await conn.begin()
         updated_records = 0
         query = """
         UPDATE student_subjects
         SET overall_marks = %s,
-            subj_pos = %s,
-            subj_ward_pos = %s,
-            subj_council_pos = %s,
-            subj_region_pos = %s,
-            subj_ward_pos_gvt = %s,
-            subj_ward_pos_pvt = %s,
-            subj_ward_pos_unknown = %s,
-            subj_council_pos_gvt = %s,
-            subj_council_pos_pvt = %s,
-            subj_council_pos_unknown = %s,
-            subj_region_pos_gvt = %s,
-            subj_region_pos_pvt = %s,
-            subj_region_pos_unknown = %s,
-            subj_pos_out_of = %s,
-            subj_ward_pos_out_of = %s,
-            subj_council_pos_out_of = %s,
-            subj_region_pos_out_of = %s,
-            subj_ward_pos_gvt_out_of = %s,
-            subj_ward_pos_pvt_out_of = %s,
-            subj_ward_pos_unknown_out_of = %s,
-            subj_council_pos_gvt_out_of = %s,
-            subj_council_pos_pvt_out_of = %s,
-            subj_council_pos_unknown_out_of = %s,
-            subj_region_pos_gvt_out_of = %s,
-            subj_region_pos_pvt_out_of = %s,
-            subj_region_pos_unknown_out_of = %s
-        WHERE exam_id = %s AND student_id = %s AND subject_code = %s
+            subject_pos = %s,
+            ward_subject_pos = %s,
+            council_subject_pos = %s,
+            region_subject_pos = %s,
+            ward_subject_pos_gvt = %s,
+            ward_subject_pos_pvt = %s,
+            council_subject_pos_gvt = %s,
+            council_subject_pos_pvt = %s,
+            region_subject_pos_gvt = %s,
+            region_subject_pos_pvt = %s,
+            subject_out_of = %s,
+            ward_subject_out_of = %s,
+            council_subject_out_of = %s,
+            region_subject_out_of = %s
+        WHERE exam_id = %s AND student_global_id = %s AND subject_code = %s
         """
+        i=0
+        totals=len(records_with_marks)
         for record in records_with_marks:
+            logger.info(f"      {i+1} / {totals} : {record['student_global_id']}")
+            i=i+1
             params = (
                 record['overall_marks'],
-                record['subj_pos'],
-                record['subj_ward_pos'],
-                record['subj_council_pos'],
-                record['subj_region_pos'],
-                record['subj_ward_pos_gvt'],
-                record['subj_ward_pos_pvt'],
-                record['subj_ward_pos_unknown'],
-                record['subj_council_pos_gvt'],
-                record['subj_council_pos_pvt'],
-                record['subj_council_pos_unknown'],
-                record['subj_region_pos_gvt'],
-                record['subj_region_pos_pvt'],
-                record['subj_region_pos_unknown'],
-                record['subj_pos_out_of'],
-                record['subj_ward_pos_out_of'],
-                record['subj_council_pos_out_of'],
-                record['subj_region_pos_out_of'],
-                record['subj_ward_pos_gvt_out_of'],
-                record['subj_ward_pos_pvt_out_of'],
-                record['subj_ward_pos_unknown_out_of'],
-                record['subj_council_pos_gvt_out_of'],
-                record['subj_council_pos_pvt_out_of'],
-                record['subj_council_pos_unknown_out_of'],
-                record['subj_region_pos_gvt_out_of'],
-                record['subj_region_pos_pvt_out_of'],
-                record['subj_region_pos_unknown_out_of'],
+                record['subject_pos'],
+                record['ward_subject_pos'],
+                record['council_subject_pos'],
+                record['region_subject_pos'],
+                record['ward_subject_pos_gvt'],
+                record['ward_subject_pos_pvt'],
+                record['council_subject_pos_gvt'],
+                record['council_subject_pos_pvt'],
+                record['region_subject_pos_gvt'],
+                record['region_subject_pos_pvt'],
+                record['subject_out_of'],
+                record['ward_subject_out_of'],
+                record['council_subject_out_of'],
+                record['region_subject_out_of'],
                 record['exam_id'],
-                record['student_id'],
+                record['student_global_id'],
                 record['subject_code']
             )
             await cursor.execute(query, params)
@@ -811,39 +729,27 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
         if conn and pool:
             pool.release(conn)
         if pool:
-            pool.close()  # <-- This is NOT awaitable
+            pool.close()
             await pool.wait_closed()
 
-            
 async def main():
     try:
-        exam_id="00eb6d05-6173-11f0-b610-80b655697afc"
-        updates=await calculate_marks_and_ranks(exam_id)
+        excel_path=r"C:\Users\droge\OneDrive\Desktop\HANDLER\DJANGO\exametrics\output\ENTRY_BUSOKELO_20250722_175856.xlsm"
+        exam_id = "1f0656e3-8756-680b-ac24-8d5b3e217521"
+        council_name = "Busokelo"
+        # file_path = await export_to_excel(
+        #     exam_id=exam_id,
+        #     council_name=council_name
+        # )
+        # print(f"Generated Excel file: {file_path}") =>=TESTED AND WORKING
+        
+        # uploaded=await import_marks_from_excel(excel_path)    =>WROKED PERFECTLY
+        updates = await calculate_marks_and_ranks(exam_id)
         print(f"Updated {updates} records for exam_id={exam_id}")
     except Exception as e:
         logger.error(f"Main function failed: {e}")
         raise
 
-
-# if __name__ == "__main__":
-#     async def main():
-#         try:
-#             file_path = await export_to_excel(
-#                 exam_id="1f063d43-67bc-6c3a-a294-69a24a3c35ac",
-#                 ward_id=0,
-#                 council_name="",
-#                 region_name="",
-#                 school_type="",
-#                 practical_mode=0
-#             )
-#             print(f"Generated Excel file: {file_path}")
-#         except Exception as e:
-#             logger.error(f"Main function failed: {e}")
-#             raise
-    
-#     asyncio.run(main())
-
-
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

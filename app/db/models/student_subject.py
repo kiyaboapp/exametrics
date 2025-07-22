@@ -1,5 +1,5 @@
 
-from sqlalchemy import Column, String, Float, ForeignKey, Integer, Index, UniqueConstraint
+from sqlalchemy import Column, String, Float, ForeignKey, Integer, Index, UniqueConstraint,DateTime,text
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 from uuid6 import uuid6
@@ -28,6 +28,10 @@ class StudentSubject(Base):
     council_subject_pos_pvt = Column(Integer)  # Council-level position for private schools
     region_subject_pos_gvt = Column(Integer)  # Region-level position for government schools
     region_subject_pos_pvt = Column(Integer)  # Region-level position for private schools
+
+    # RELATIONSHIPS
+    submitted_by=Column(String(50))
+    submitted_on = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     student = relationship("Student", back_populates="student_subjects")
     exam = relationship("Exam")
     school = relationship("School")
