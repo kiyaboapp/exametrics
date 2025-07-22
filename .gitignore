@@ -54,3 +54,5 @@ Thumbs.db
 
 # Pydantic cache
 __pydantic__/ 
+
+*.pdf
