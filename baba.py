@@ -11,7 +11,7 @@ async def main():
     await init_db()
     
     exam_id = "1f0656e3-8756-680b-ac24-8d5b3e217521"
-    centre_number = "s0112"
+    centre_number = "s0330"
     ministry = "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT"
     report_name = "INDIVIDUAL ATTENDANCE LIST"
     
@@ -25,7 +25,8 @@ async def main():
                 centre_number=centre_number,
                 exam_id=exam_id,
                 ministry=ministry,
-                report_name=report_name
+                report_name=report_name,
+                subject_filter="TheoryOnly"
             )
 
             print("==================================================================")

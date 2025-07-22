@@ -8,13 +8,15 @@ async def get_student_subjects_by_centre_and_exam(
     centre_number: str, 
     exam_id: str,
     ministry: str = "PO - REGIONAL ADMINISTRATION AND LOCAL GOVERNMENT",
-    report_name: str = "INDIVIDUAL ATTENDANCE LIST"
+    report_name: str = "INDIVIDUAL ATTENDANCE LIST",
+    subject_filter: str = "All"
 ) -> tuple[Dict[str, List[Tuple[str, str, str]]], dict]:
     """
     Returns a tuple containing:
     1. Dictionary mapping subject codes to lists of student data tuples.
     2. School info dictionary with ministry, exam board, school name, and report name.
     Splits subjects with has_practical=True into theory (code/1) and practical (code/2).
+    subject_filter: 'All' (default), 'PracticalOnly' (only practical subjects), 'TheoryOnly' (no practical parts).
     """
     result = {}
     school_info = {}
@@ -69,18 +71,28 @@ async def get_student_subjects_by_centre_and_exam(
                 subject_name = row.subject_name.upper()
                 has_practical = row.has_practical
                 
-                if has_practical:
-                    theory_key = f"{subject_code}/1 - {subject_name}"
-                    theory_data = (row.student_id, row.full_name, row.sex)
-                    result.setdefault(theory_key, []).append(theory_data)
-                    
-                    practical_key = f"{subject_code}/2 - {subject_name} (PRACTICAL)"
-                    practical_data = (row.student_id, row.full_name, row.sex)
-                    result.setdefault(practical_key, []).append(practical_data)
-                else:
+                if subject_filter == "PracticalOnly":
+                    if has_practical:
+                        practical_key = f"{subject_code}/2 - {subject_name} (PRACTICAL)"
+                        practical_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(practical_key, []).append(practical_data)
+                elif subject_filter == "TheoryOnly":
                     key = f"{subject_code} - {subject_name}"
                     student_data = (row.student_id, row.full_name, row.sex)
                     result.setdefault(key, []).append(student_data)
+                else:  # All
+                    if has_practical:
+                        theory_key = f"{subject_code}/1 - {subject_name}"
+                        theory_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(theory_key, []).append(theory_data)
+                        
+                        practical_key = f"{subject_code}/2 - {subject_name} (PRACTICAL)"
+                        practical_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(practical_key, []).append(practical_data)
+                    else:
+                        key = f"{subject_code} - {subject_name}"
+                        student_data = (row.student_id, row.full_name, row.sex)
+                        result.setdefault(key, []).append(student_data)
                     
             except Exception as row_error:
                 continue
@@ -99,5 +111,3 @@ async def get_student_subjects_by_centre_and_exam(
         raise
         
     return result, school_info
-
-
