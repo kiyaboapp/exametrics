@@ -21,6 +21,13 @@ import re
 from typing import List
 import logging
 
+# Configure logging to file
+logging.basicConfig(
+    filename='student_processing_errors.log',
+    level=logging.ERROR,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 async def resolve_location_data(db: AsyncSession, school_data: dict) -> dict:
     rn = school_data.get("region_name")
     cn = school_data.get("council_name")
@@ -299,7 +306,14 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
         student_id = row['CANDIDATE']
         centre_number = row['CENTRE_NUMBER']
         if (student_id, centre_number) not in existing_students:
-            full_name = row['FULL NAME'].strip().split()
+            full_name = row['FULL NAME']
+            if pd.isna(full_name) or full_name is None:
+                error_msg = f"Invalid full_name for student_id: {student_id}, centre_number: {centre_number}"
+                logging.error(error_msg)
+                with open('student_processing_errors.log', 'a') as f:
+                    f.write(f"{error_msg}\n")
+                continue
+            full_name = full_name.strip().split()
             if len(full_name) >= 3:
                 first_name = full_name[0]
                 surname = full_name[-1]
@@ -327,9 +341,12 @@ async def process_batch_pdf_data(db: AsyncSession, pdf_paths: List[str], exam_id
             )
             student_global_ids[(student_id, centre_number)] = student_global_id
         else:
-            logging.info(f"Skipping duplicate student in pre-check: {student_id} in centre {centre_number}")
+            logging.info(f"Skipping duplicate student: {student_id}, centre: {centre_number}")
             student_global_ids[(student_id, centre_number)] = existing_students[(student_id, centre_number)]
-    
+
+
+
+
     if students_to_add:
         student_params = [
             {

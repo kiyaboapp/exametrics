@@ -1,0 +1,19 @@
+# Database configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=''
+DB_NAME=exametrics
+
+# Application settings
+SECRET_KEY=3VRFoSuaIwvnpPOKynbgZ768NqD1VC4W2KT0FseCVH0
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+ALLOWED_ORIGINS=http://localhost
+
+
+# Application settings
+PROJECT_NAME=Exametrics
+API_V1_STR=/api/v1
+
+

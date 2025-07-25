@@ -10,10 +10,15 @@ class Result(Base):
     exam_id = Column(String(36), ForeignKey("exams.exam_id", ondelete="CASCADE"))
     student_global_id = Column(String(36), ForeignKey("students.student_global_id", ondelete="CASCADE"))
     centre_number = Column(String(10), ForeignKey("schools.centre_number", ondelete="CASCADE"))
+
+    # TOTALS AND SUMMATIONS
     avg_marks = Column(Float)
+    avg_grade=Column(String(10))
     total_marks = Column(Float)
     division = Column(String(3))
     total_points = Column(Integer)
+
+    # RANKINGS
     pos = Column(Integer)
     out_of = Column(Integer)
     ward_pos = Column(Integer)
@@ -28,6 +33,10 @@ class Result(Base):
     council_pos_pvt = Column(Integer)
     region_pos_gvt = Column(Integer)
     region_pos_pvt = Column(Integer)
+    school_pos=Column(Integer)
+    school_out_of=Column(Integer)
+
+    # READ-ONLY FIELDS
     created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     student = relationship("Student", back_populates="results")
     exam = relationship("Exam", back_populates="results")

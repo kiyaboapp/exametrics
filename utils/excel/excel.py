@@ -1,15 +1,19 @@
+import asyncio
 import os
 import shutil
 from datetime import datetime
 import time
 import logging
+from typing import Any, Dict
 import aiomysql
 from dotenv import load_dotenv
+import numpy as np
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
 import pandas as pd
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.sql import text
+from uuid6 import uuid6
 
 # Load environment variables
 if not os.path.exists('.env'):
@@ -72,8 +76,6 @@ async def get_excel_workbook_name(
     if result:
         return f"ENTRY_{separator.join(result)}_{timestamp}".upper()
     return f"ENTRY_SHEET_JOINT_EXAM_{timestamp}".upper()
-
-
 
 async def export_to_excel(
     exam_id: str,
@@ -741,6 +743,8 @@ async def import_marks_from_excel(file_path: str) -> int:
 
 async def calculate_marks_and_ranks(exam_id: str) -> int:
     """Calculate overall_marks and rankings for student_subjects table using pandas. Return number of updated records."""
+    info=await clear_student_subject_results(exam_id)
+    print(info)
     start_time = time.perf_counter()
     pool = None
     conn = None
@@ -933,25 +937,331 @@ async def calculate_marks_and_ranks(exam_id: str) -> int:
             await engine.dispose()
 
 
-async def main():
-    try:
-        excel_path = r"C:\Users\droge\OneDrive\Documents\ENTRY_MBEYA_20250722_214853.xlsm"
-        exam_id = "1f0656e3-8756-680b-ac24-8d5b3e217521"
-        region_name = "Mbeya"
-        # file_path = await export_to_excel(
-        #     exam_id=exam_id,
-        #     region_name=region_name,
-        #     marks_filler="DAFROSA DISMAS"
-        # )
-        # print(f"Generated Excel file: {file_path}")
+async def process_exam_results(exam_id: str):
+    logger.info(f"Starting exam results processing for exam_id: {exam_id}")
+    
+    # Create aiomysql connection pool
+    logger.info(f"Creating aiomysql connection pool for database: {DB_CONFIG['db']}")
+    pool = await aiomysql.create_pool(
+        host=DB_CONFIG['host'],
+        port=DB_CONFIG['port'],
+        user=DB_CONFIG['user'],
+        password=DB_CONFIG['password'],
+        db=DB_CONFIG['db'],
+        maxsize=DB_CONFIG['maxsize'],
+        charset='utf8mb4'
+    )
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            try:
+                # Load reference data
+                logger.info(f"Loading exam grades for exam_id: {exam_id}")
+                grades_query = "SELECT exam_id, grade, lower_value, highest_value, grade_points, division_points FROM exam_grades WHERE exam_id = %s"
+                await cur.execute(grades_query, (exam_id,))
+                grades_df = pd.DataFrame(await cur.fetchall(), columns=['exam_id', 'grade', 'lower_value', 'highest_value', 'grade_points', 'division_points'])
+                logger.info(f"Loaded {len(grades_df)} grade records")
+
+                logger.info(f"Loading exam divisions for exam_id: {exam_id}")
+                divisions_query = "SELECT exam_id, division, lowest_points, highest_points FROM exam_divisions WHERE exam_id = %s"
+                await cur.execute(divisions_query, (exam_id,))
+                divisions_df = pd.DataFrame(await cur.fetchall(), columns=['exam_id', 'division', 'lowest_points', 'highest_points'])
+                logger.info(f"Loaded {len(divisions_df)} division records")
+
+                logger.info(f"Loading exam data for exam_id: {exam_id}")
+                exams_query = "SELECT exam_id, avg_style FROM exams WHERE exam_id = %s"
+                await cur.execute(exams_query, (exam_id,))
+                exams_df = pd.DataFrame(await cur.fetchall(), columns=['exam_id', 'avg_style'])
+                logger.info(f"Loaded {len(exams_df)} exam records")
+
+                if exams_df.empty:
+                    logger.error(f"No exam found for exam_id: {exam_id}")
+                    return
+
+                avg_style = exams_df['avg_style'].iloc[0]
+                logger.info(f"Exam avg_style: {avg_style}")
+
+                logger.info(f"Loading schools with at least one student record")
+                schools_query = """
+                    SELECT DISTINCT s.centre_number, s.region_name, s.council_name, s.ward_name, s.school_type
+                    FROM schools s
+                    INNER JOIN students st ON s.centre_number = st.centre_number
+                """
+                await cur.execute(schools_query)
+                schools_df = pd.DataFrame(await cur.fetchall(), columns=['centre_number', 'region_name', 'council_name', 'ward_name', 'school_type'])
+                logger.info(f"Loaded {len(schools_df)} school records with student data")
+
+                # Load student subjects
+                logger.info(f"Loading student subjects for exam_id: {exam_id}")
+                subjects_query = """
+                    SELECT id, exam_id, student_global_id, centre_number, overall_marks, subject_code
+                    FROM student_subjects WHERE exam_id = %s
+                """
+                await cur.execute(subjects_query, (exam_id,))
+                subjects_df = pd.DataFrame(await cur.fetchall(), columns=['id', 'exam_id', 'student_global_id', 'centre_number', 'overall_marks', 'subject_code'])
+                logger.info(f"Loaded {len(subjects_df)} student subject records")
+
+                if subjects_df.empty:
+                    logger.warning(f"No student subjects found for exam_id: {exam_id}")
+                    return
+
+                # Map grades
+                logger.info(f"Mapping grades for {len(subjects_df)} records")
+                def map_grade(marks):
+                    if pd.notnull(marks):
+                        grade_row = grades_df[(grades_df['lower_value'] < marks) & (marks <= grades_df['highest_value'])]
+                        return grade_row['grade'].iloc[0] if not grade_row.empty else None
+                    return None
+
+                def map_grade_points(marks):
+                    if pd.notnull(marks):
+                        grade_row = grades_df[(grades_df['lower_value'] < marks) & (marks <= grades_df['highest_value'])]
+                        return grade_row['grade_points'].iloc[0] if not grade_row.empty else None
+                    return None
+
+                subjects_df['subject_grade'] = subjects_df['overall_marks'].apply(map_grade)
+                subjects_df['grade_points'] = subjects_df['overall_marks'].apply(map_grade_points)
+                logger.info(f"Completed grade mapping")
+
+                # Update student_subjects
+                logger.info(f"Updating student_subjects for {len(subjects_df)} records")
+                for i, row in subjects_df.iterrows():
+                    await cur.execute(
+                        "UPDATE student_subjects SET subject_grade = %s WHERE id = %s",
+                        (row['subject_grade'], row['id'])
+                    )
+                    if (i + 1) % 1000 == 0:
+                        logger.info(f"Updated {i + 1} student subject records")
+                        await conn.commit()
+                await conn.commit()
+                logger.info(f"Finished updating student_subjects")
+
+                # Compute results
+                logger.info(f"Computing results for exam_id: {exam_id}")
+                results = subjects_df.groupby(['exam_id', 'student_global_id', 'centre_number']).agg({
+                    'overall_marks': ['sum', 'count', lambda x: x.nlargest(7).sum()],
+                    'grade_points': lambda x: x.nlargest(7).sum()
+                }).reset_index()
+                results.columns = ['exam_id', 'student_global_id', 'centre_number', 'total_marks', 'subject_count', 'best_7_marks', 'total_points']
+                logger.info(f"Computed results for {len(results)} students")
+
+                # Compute avg_marks
+                logger.info(f"Computing average marks with style: {avg_style}")
+                if avg_style == 'AUTO':
+                    results['avg_marks'] = np.where(
+                        results['subject_count'] >= 7,
+                        results['total_marks'] / results['subject_count'],
+                        results['total_marks'] / 7
+                    )
+                elif avg_style == 'SEVEN_BEST':
+                    results['avg_marks'] = results['best_7_marks'] / 7
+                elif avg_style == 'EIGHT_BEST':
+                    results['avg_marks'] = results['best_7_marks'] / 8
+                logger.info(f"Completed average marks calculation")
+
+                # Map avg_grade
+                logger.info(f"Mapping average grades for {len(results)} records")
+                results['avg_grade'] = results['avg_marks'].apply(map_grade)
+                logger.info(f"Completed average grade mapping")
+
+                # Map division
+                logger.info(f"Mapping divisions for {len(results)} records")
+                results['division'] = results.apply(
+                    lambda row: divisions_df[
+                        (divisions_df['lowest_points'] <= row['total_points']) & 
+                        (row['total_points'] <= divisions_df['highest_points'])
+                    ]['division'].iloc[0] if pd.notnull(row['total_points']) and not divisions_df[
+                        (divisions_df['lowest_points'] <= row['total_points']) & 
+                        (row['total_points'] <= divisions_df['highest_points'])
+                    ].empty else 'INC' if row['subject_count'] < 7 else 'ABS',
+                    axis=1
+                )
+                logger.info(f"Completed division mapping")
+
+                # Merge school data
+                logger.info(f"Merging school data")
+                results = results.merge(schools_df, on='centre_number', how='left')
+                logger.info(f"Completed school data merge")
+
+                # Initialize ranking columns to avoid index errors
+                logger.info(f"Initializing ranking columns")
+                for col in ['ward_pos', 'ward_out_of', 'council_pos', 'council_out_of', 'region_pos', 'region_out_of',
+                            'ward_pos_gvt', 'ward_pos_pvt', 'council_pos_gvt', 'council_pos_pvt', 'region_pos_gvt', 'region_pos_pvt']:
+                    results[col] = pd.NA
+                results = results.astype({col: 'Int64' for col in ['ward_pos', 'ward_out_of', 'council_pos', 'council_out_of', 
+                                                                  'region_pos', 'region_out_of', 'ward_pos_gvt', 'ward_pos_pvt', 
+                                                                  'council_pos_gvt', 'council_pos_pvt', 'region_pos_gvt', 'region_pos_pvt']})
+                logger.info(f"Initialized ranking columns")
+
+                # Compute rankings
+                logger.info(f"Computing rankings for exam_id: {exam_id}")
+                results['pos'] = results[results['avg_marks'].notnull()]['avg_marks'].rank(ascending=False, method='dense').astype('Int64')
+                results['out_of'] = results[results['avg_marks'].notnull()].shape[0]
+                logger.info(f"Computed overall rankings: {results['out_of'].iloc[0]} students")
+
+                for level in ['ward', 'council', 'region']:
+                    logger.info(f"Computing {level} rankings")
+                    for school_type in ['GOVERNMENT', 'PRIVATE']:
+                        for name in results[f'{level}_name'].dropna().unique():
+                            mask = (results[f'{level}_name'] == name) & (results['school_type'] == school_type) & (results['avg_marks'].notnull())
+                            if mask.any():
+                                results.loc[mask, f'{level}_pos_{school_type[:3].lower()}'] = results[mask]['avg_marks'].rank(ascending=False, method='dense').astype('Int64')
+                            mask_all = (results[f'{level}_name'] == name) & (results['avg_marks'].notnull())
+                            if mask_all.any():
+                                results.loc[mask_all, f'{level}_pos'] = results[mask_all]['avg_marks'].rank(ascending=False, method='dense').astype('Int64')
+                                results.loc[mask_all, f'{level}_out_of'] = results[mask_all].shape[0]
+                    logger.info(f"Completed {level} rankings")
+
+                # Prepare results for insertion
+                logger.info(f"Preparing {len(results)} results for insertion")
+                results['id'] = [str(uuid6()) for _ in range(len(results))]
+                results['created_at'] = pd.Timestamp.now()
+                results = results[['id', 'exam_id', 'student_global_id', 'centre_number', 'avg_marks', 'avg_grade', 
+                                 'total_marks', 'division', 'total_points', 'pos', 'out_of', 
+                                 'ward_pos', 'ward_out_of', 'council_pos', 'council_out_of', 
+                                 'region_pos', 'region_out_of', 'ward_pos_gvt', 'ward_pos_pvt', 
+                                 'council_pos_gvt', 'council_pos_pvt', 'region_pos_gvt', 'region_pos_pvt', 
+                                 'created_at']]
+                logger.info(f"Prepared results DataFrame")
+
+                # Insert results
+                logger.info(f"Inserting {len(results)} results into results table")
+                for i, row in results.iterrows():
+                    await cur.execute(
+                        """
+                        INSERT INTO results (id, exam_id, student_global_id, centre_number, avg_marks, avg_grade, 
+                                            total_marks, division, total_points, pos, out_of, 
+                                            ward_pos, ward_out_of, council_pos, council_out_of, 
+                                            region_pos, region_out_of, ward_pos_gvt, ward_pos_pvt, 
+                                            council_pos_gvt, council_pos_pvt, region_pos_gvt, region_pos_pvt, 
+                                            created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        tuple(row)
+                    )
+                    if (i + 1) % 1000 == 0:
+                        logger.info(f"Inserted {i + 1} result records")
+                        await conn.commit()
+                await conn.commit()
+                logger.info(f"Completed insertion of {len(results)} results")
+
+                logger.info(f"Processing completed successfully for exam_id: {exam_id}")
         
-        uploaded = await import_marks_from_excel(excel_path)
-        updates = await calculate_marks_and_ranks(exam_id)
-        print(f"Updated {updates} records for exam_id={exam_id}")
+            except Exception as e:
+                logger.error(f"Error during processing for exam_id {exam_id}: {str(e)}")
+                await conn.rollback()
+                raise
+            finally:
+                logger.info(f"Closing connection pool")
+                pool.close()
+                await pool.wait_closed()
+                logger.info(f"Connection pool closed")
+
+
+async def clear_student_subject_results(exam_id: str, clear_overall_marks: bool = False) -> Dict[str, Any]:
+    """
+    Clears results for a specific exam in the StudentSubject table using aiomysql.
+    
+    Args:
+        exam_id (str): The exam ID to clear results for
+        clear_overall_marks (bool): Whether to also clear overall_marks (default False)
+    
+    Returns:
+        Dict[str, Any]: Status dictionary with 'status' and 'message' keys
+    """
+    # Base SQL statement
+    sql = """
+        UPDATE student_subjects
+        SET 
+            theory_marks = NULL,
+            practical_marks = NULL,
+            subject_grade = NULL,
+            subject_pos = NULL,
+            subject_out_of = NULL,
+            ward_subject_pos = NULL,
+            ward_subject_out_of = NULL,
+            council_subject_pos = NULL,
+            council_subject_out_of = NULL,
+            region_subject_pos = NULL,
+            region_subject_out_of = NULL,
+            ward_subject_pos_gvt = NULL,
+            ward_subject_pos_pvt = NULL,
+            council_subject_pos_gvt = NULL,
+            council_subject_pos_pvt = NULL,
+            region_subject_pos_gvt = NULL,
+            region_subject_pos_pvt = NULL,
+            submitted_by = NULL,
+            submitted_on = NULL
+    """
+    
+    # Add overall_marks if requested
+    if clear_overall_marks:
+        sql += ", overall_marks = NULL"
+    
+    # Add WHERE clause
+    sql += " WHERE exam_id = %s"
+    
+    try:
+        # Create connection pool
+        pool = await aiomysql.create_pool(
+            host=DB_CONFIG['host'],
+            port=DB_CONFIG['port'],
+            user=DB_CONFIG['user'],
+            password=DB_CONFIG['password'],
+            db=DB_CONFIG['db'],
+            minsize=1,
+            maxsize=DB_CONFIG['maxsize']
+        )
+        
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                # Execute the update
+                await cursor.execute(sql, (exam_id,))
+                affected_rows = cursor.rowcount
+                
+                # Commit the transaction
+                await conn.commit()
+                
+                return {
+                    "status": "success",
+                    "message": f"Cleared results for {affected_rows} records in exam {exam_id}",
+                    "affected_rows": affected_rows
+                }
+                
     except Exception as e:
-        logger.error(f"Main function failed: {e}")
-        raise
+        return {
+            "status": "error",
+            "message": f"Failed to clear results: {str(e)}"
+        }
+    finally:
+        if 'pool' in locals():
+            pool.close()
+            await pool.wait_closed()
+
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    asyncio.run(process_exam_results("1f0656f7-02b1-6b0c-898c-73f64b350f15"))
+
+# async def main():
+#     try:
+#         excel_path = r"C:\Users\droge\OneDrive\Documents\ENTRY_MBEYA_20250724_223553.xlsm"
+#         exam_id = "1f0656f7-02b1-6b0c-898c-73f64b350f15"
+#         region_name = "Mbeya"
+#         # file_path = await export_to_excel(
+#         #     exam_id=exam_id,
+#         #     region_name=region_name,
+#         #     marks_filler="DAFROSA DISMAS"
+#         # )
+#         # print(f"Generated Excel file: {file_path}")
+        
+#         # uploaded = await import_marks_from_excel(excel_path)
+#         updates = await calculate_marks_and_ranks(exam_id)
+#         print(f"Updated {updates} records for exam_id={exam_id}")
+#         # await process_exam_results(exam_id)
+#     except Exception as e:
+#         logger.error(f"Main function failed: {e}")
+#         raise
+
+# if __name__ == "__main__":
+#     import asyncio
+#     asyncio.run(main())

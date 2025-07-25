@@ -154,13 +154,13 @@ async def upload_zip(file: UploadFile = File(...), exam_id: str = None, db: Asyn
             
             total_pdfs = len(pdf_paths)
             if total_pdfs <= 30:
-                chunk_size = total_pdfs  # Process all at once
+                chunk_size = total_pdfs//2 or 1  # Process all at once
             elif total_pdfs <= 100:
-                chunk_size = total_pdfs // 3 or 1  # 2-3 chunks
+                chunk_size = total_pdfs // 5 or 1  # 2-3 chunks
             elif total_pdfs <= 200:
-                chunk_size = total_pdfs // 5 or 1  # 4-5 chunks
+                chunk_size = total_pdfs // 10 or 1  # 4-5 chunks
             else:
-                chunk_size = min(100, total_pdfs // 10 or 1)  # Up to 10 chunks, max 100 per chunk
+                chunk_size = min(100, total_pdfs // 20 or 1)  # Up to 10 chunks, max 100 per chunk
             
             for i in range(0, total_pdfs, chunk_size):
                 chunk = pdf_paths[i:i + chunk_size]

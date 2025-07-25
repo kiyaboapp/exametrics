@@ -14,6 +14,7 @@ class StudentSubject(Base):
     theory_marks = Column(Float)
     practical_marks = Column(Float)
     overall_marks = Column(Float)
+    subject_grade=Column(String(10))
     subject_pos = Column(Integer)  # School-level position for this subject
     subject_out_of = Column(Integer)  # Total students for this subject at school
     ward_subject_pos = Column(Integer)  # Ward-level position for this subject
