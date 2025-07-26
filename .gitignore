@@ -56,3 +56,8 @@ Thumbs.db
 __pydantic__/ 
 
 *.pdf
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+output/
