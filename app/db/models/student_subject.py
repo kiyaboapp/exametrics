@@ -24,12 +24,19 @@ class StudentSubject(Base):
     region_subject_pos = Column(Integer)  # Region-level position for this subject
     region_subject_out_of = Column(Integer)  # Total students for this subject in region
     ward_subject_pos_gvt = Column(Integer)  # Ward-level position for government schools
+    ward_subject_out_of_gvt=Column(Integer)
     ward_subject_pos_pvt = Column(Integer)  # Ward-level position for private schools
+    ward_subject_out_of_pvt=Column(Integer)
     council_subject_pos_gvt = Column(Integer)  # Council-level position for government schools
+    council_subject_out_of_gvt=Column(Integer)
     council_subject_pos_pvt = Column(Integer)  # Council-level position for private schools
+    council_subject_out_of_pvt=Column(Integer)
     region_subject_pos_gvt = Column(Integer)  # Region-level position for government schools
+    region_subject_out_of_gvt=Column(Integer)
     region_subject_pos_pvt = Column(Integer)  # Region-level position for private schools
+    region_subject_out_of_pvt=Column(Integer)
 
+    
     # RELATIONSHIPS
     submitted_by=Column(String(50))
     submitted_on = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
