@@ -36,6 +36,57 @@ class Result(Base):
     school_pos=Column(Integer)
     school_out_of=Column(Integer)
 
+
+    # SEX-WISE RANKINGS
+
+    # School
+    school_pos_F = Column(Integer)
+    school_pos_M = Column(Integer)
+    school_out_of_F = Column(Integer)
+    school_out_of_M = Column(Integer)
+
+    # Ward
+    ward_pos_F = Column(Integer)
+    ward_pos_M = Column(Integer)
+    ward_out_of_F = Column(Integer)
+    ward_out_of_M = Column(Integer)
+
+    # Ward - Government
+    ward_pos_gvt_F = Column(Integer)
+    ward_pos_gvt_M = Column(Integer)
+
+    # Ward - Private
+    ward_pos_pvt_F = Column(Integer)
+    ward_pos_pvt_M = Column(Integer)
+
+    # Council
+    council_pos_F = Column(Integer)
+    council_pos_M = Column(Integer)
+    council_out_of_F = Column(Integer)
+    council_out_of_M = Column(Integer)
+
+    # Council - Government
+    council_pos_gvt_F = Column(Integer)
+    council_pos_gvt_M = Column(Integer)
+
+    # Council - Private
+    council_pos_pvt_F = Column(Integer)
+    council_pos_pvt_M = Column(Integer)
+
+    # Region
+    region_pos_F = Column(Integer)
+    region_pos_M = Column(Integer)
+    region_out_of_F = Column(Integer)
+    region_out_of_M = Column(Integer)
+
+    # Region - Government
+    region_pos_gvt_F = Column(Integer)
+    region_pos_gvt_M = Column(Integer)
+
+    # Region - Private
+    region_pos_pvt_F = Column(Integer)
+    region_pos_pvt_M = Column(Integer)
+
     # READ-ONLY FIELDS
     created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
     student = relationship("Student", back_populates="results")

@@ -8,8 +8,13 @@ from typing import Dict, List, Any, Tuple
 import logging
 from app.core.config import settings
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging to file
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='division_processor.log',
+    filemode='a'
+)
 
 class DivisionProcessor:
     def __init__(self, exam_id: str):
@@ -127,11 +132,59 @@ class DivisionProcessor:
 
         return students, exams, exam_subjects, student_subjects, exam_grades, exam_divisions
 
+    def handle_absent_cases(self, df: pd.DataFrame, is_old_curriculum: bool, min_subjects: int) -> pd.DataFrame:
+        self.logger.debug("Handling absent and invalid cases")
+        best_cols = [f'best_{i}' for i in range(1, min_subjects + 1)]
+        rank_cols = [
+            'pos', 'out_of', 'ward_pos', 'ward_out_of', 'ward_pos_gvt', 'ward_pos_pvt',
+            'council_pos', 'council_out_of', 'council_pos_gvt', 'council_pos_pvt',
+            'region_pos', 'region_out_of', 'region_pos_gvt', 'region_pos_pvt', 
+            'school_pos', 'school_out_of'
+        ]
+        null_cols = ['avg_marks', 'total_marks', 'avg_grade', 'total_points'] + rank_cols
+        
+        # Count valid marks
+        valid_marks_count = df[best_cols].count(axis=1)
+        
+        # Absent: No valid marks
+        absent_mask = valid_marks_count == 0
+        df.loc[absent_mask, 'division'] = 'ABS'
+        df.loc[absent_mask, null_cols] = np.nan
+        n_abs = absent_mask.sum()
+        self.logger.debug(f"Marked {n_abs} students as ABS (no valid marks)")
+        if n_abs > 0:
+            self.logger.debug(f"Sample ABS students: {df[absent_mask][['student_global_id', 'division'] + best_cols].head(2).to_dict(orient='records')}")
+
+        # Incomplete: Fewer than required subjects
+        incomplete_mask = (valid_marks_count > 0) & (valid_marks_count < min_subjects)
+        df.loc[incomplete_mask, 'division'] = 'INC'
+        df.loc[incomplete_mask, null_cols] = np.nan
+        n_inc = incomplete_mask.sum()
+        self.logger.debug(f"Marked {n_inc} students as INC (fewer than {min_subjects} valid marks)")
+        if n_inc > 0:
+            self.logger.debug(f"Sample INC students: {df[incomplete_mask][['student_global_id', 'division'] + best_cols].head(2).to_dict(orient='records')}")
+
+        # Invalid avg_marks: < 0 or null
+        invalid_mask = (df['avg_marks'] < 0) | df['avg_marks'].isna()
+        df.loc[invalid_mask, 'division'] = 'ABS'
+        df.loc[invalid_mask, null_cols] = np.nan
+        n_invalid = invalid_mask.sum()
+        self.logger.debug(f"Marked {n_invalid} students as ABS (invalid avg_marks)")
+        if n_invalid > 0:
+            self.logger.debug(f"Sample invalid avg_marks students: {df[invalid_mask][['student_global_id', 'avg_marks', 'division']].head(2).to_dict(orient='records')}")
+
+        return df
+
     async def process_data(self, students: pd.DataFrame, exams: pd.DataFrame, 
                           exam_subjects: pd.DataFrame, student_subjects: pd.DataFrame,
                           exam_grades: pd.DataFrame, exam_divisions: pd.DataFrame) -> pd.DataFrame:
         self.logger.debug("Starting data processing")
         
+        # Check curriculum based on subject '011'
+        is_old_curriculum = exam_subjects[exam_subjects['exam_id'] == self.exam_id]['subject_code'].eq('011').any()
+        min_subjects = 7 if is_old_curriculum else 8
+        self.logger.debug(f"Curriculum: {'Old (7 subjects)' if is_old_curriculum else 'New (8 subjects)'}, min_subjects: {min_subjects}")
+
         # Merge students with exams
         self.logger.debug("Merging students with exams")
         df = students.merge(exams[['exam_id', 'avg_style']], on='exam_id', how='left')
@@ -149,22 +202,30 @@ class DivisionProcessor:
         df = df.merge(subject_pivot, on=['student_global_id', 'exam_id', 'centre_number'], how='left')
         self.logger.debug(f"After subject merge, DataFrame shape: {df.shape}, columns: {list(df.columns)}")
 
-        # Initialize best 8 subjects
+        # Initialize best subjects
         subject_codes = exam_subjects[exam_subjects['exam_id'] == self.exam_id]['subject_code'].tolist()
         subject_codes_dict = {self.exam_id: subject_codes}
         self.logger.debug(f"Subject codes for exam_id {self.exam_id}: {subject_codes}")
-        for i in range(1, 9):
+        n_subjects = min_subjects
+        for i in range(1, n_subjects + 1):
             df[f'best_{i}'] = np.nan
+            df[f'best_{i}_subject'] = np.nan
 
-        # Fill best 8 subjects
-        self.logger.debug("Calculating top 8 subject marks")
+        # Fill best subjects
+        self.logger.debug(f"Calculating top {n_subjects} subject marks and subjects")
         marks_matrix = df[subject_codes].to_numpy()
+        subject_indices = np.arange(len(subject_codes))
         filled = np.where(np.isnan(marks_matrix), -1e9, marks_matrix)
-        sorted_indices = np.argsort(-filled, axis=1)[:, :8]
+        sorted_indices = np.argsort(-filled, axis=1)[:, :n_subjects]
         row_indices = np.arange(len(df))[:, None]
-        top8 = marks_matrix[row_indices, sorted_indices]
-        df[[f'best_{i+1}' for i in range(8)]] = top8
-        self.logger.debug(f"Assigned top 8 subjects, columns added: {[f'best_{i+1}' for i in range(8)]}")
+        top_marks = marks_matrix[row_indices, sorted_indices]
+        top_subjects = np.array(subject_codes)[sorted_indices]
+        for i in range(n_subjects):
+            df[f'best_{i+1}'] = top_marks[:, i]
+            df[f'best_{i+1}_subject'] = top_subjects[:, i]
+        self.logger.debug(f"Assigned top {n_subjects} subjects and marks, columns added: {[f'best_{i+1}' for i in range(n_subjects)] + [f'best_{i+1}_subject' for i in range(n_subjects)]}")
+        sample_best = df[['student_global_id'] + [f'best_{i+1}' for i in range(n_subjects)] + [f'best_{i+1}_subject' for i in range(n_subjects)]].head(2)
+        self.logger.debug(f"Sample best subjects: {sample_best.to_dict(orient='records')}")
 
         # Calculate division points
         self.logger.debug("Creating division points lookup")
@@ -182,11 +243,15 @@ class DivisionProcessor:
             self.logger.error(f"No division lookup data for exam_id {self.exam_id}")
             raise ValueError(f"No division lookup data for exam_id {self.exam_id}")
 
-        def map_points_vectorized(best_marks: pd.Series, exam_ids: pd.Series) -> List[float]:
-            self.logger.debug(f"Mapping points for column, marks count: {best_marks.count()}")
+        def map_points_vectorized(best_marks: pd.Series, exam_ids: pd.Series, col_name: str) -> List[float]:
+            self.logger.debug(f"Mapping points for column {col_name}, marks count: {best_marks.count()}")
             results = []
             for idx, (mark, exam_id) in enumerate(zip(best_marks, exam_ids)):
                 if pd.isna(mark) or exam_id not in division_lookup:
+                    results.append(np.nan)
+                    continue
+                if mark < 0 or mark > 100:
+                    self.logger.warning(f"Outlier mark {mark} for student at index {idx} in {col_name}, assigned null points")
                     results.append(np.nan)
                     continue
                 try:
@@ -194,25 +259,35 @@ class DivisionProcessor:
                     for lower, points in lookup:
                         if mark >= lower:
                             results.append(points)
+                            if idx < 2:
+                                self.logger.debug(f"Assigned points {points} for mark {mark} in {col_name}")
                             break
                     else:
-                        results.append(lookup[-1][1])
+                        results.append(np.nan)
+                        if idx < 2:
+                            self.logger.debug(f"Assigned null points for mark {mark} in {col_name} (below lowest threshold)")
                 except Exception as e:
                     self.logger.error(f"Error mapping points at index {idx}, mark {mark}, exam_id {exam_id}: {str(e)}", exc_info=True)
                     results.append(np.nan)
-            self.logger.debug(f"Completed mapping points, results length: {len(results)}")
+            self.logger.debug(f"Completed mapping points for {col_name}, results length: {len(results)}")
             return results
 
-        for i in range(1, 9):
+        for i in range(1, n_subjects + 1):
             self.logger.debug(f"Calculating points for best_{i}")
-            df[f'best_{i}_points'] = map_points_vectorized(df[f'best_{i}'], df['exam_id'])
+            df[f'best_{i}_points'] = map_points_vectorized(df[f'best_{i}'], df['exam_id'], f'best_{i}')
             self.logger.debug(f"best_{i}_points assigned, non-null count: {df[f'best_{i}_points'].count()}")
+
+        # Define points_cols before calculating total_points
+        points_cols = [f'best_{i}_points' for i in range(1, n_subjects + 1)]
+        self.logger.debug(f"Points columns defined: {points_cols}")
 
         # Calculate total points
         self.logger.debug("Calculating total points")
-        df['total_points'] = df[[f'best_{i}_points' for i in range(1, 9)]].sum(axis=1, skipna=True)
-        df.loc[df[[f'best_{i}' for i in range(1, 9)]].count(axis=1) < 7, 'total_points'] = -1
+        df['total_points'] = df[points_cols].sum(axis=1, skipna=True)
+        df.loc[df[points_cols].count(axis=1) < min_subjects, 'total_points'] = -1
         self.logger.debug(f"Total points calculated, non-null count: {df['total_points'].count()}")
+        sample_points = df[['student_global_id'] + points_cols + ['total_points']].head(2)
+        self.logger.debug(f"Sample total points: {sample_points.to_dict(orient='records')}")
 
         # Calculate divisions
         self.logger.debug("Creating division lookup")
@@ -234,25 +309,38 @@ class DivisionProcessor:
             self.logger.debug(f"Mapping divisions, points count: {total_points.count()}")
             results = []
             for idx, (points, exam_id) in enumerate(zip(total_points, exam_ids)):
-                if points == -1 or pd.isna(points) or exam_id not in division_lookup:
-                    results.append(np.nan)
+                if points == -1:
+                    results.append('INC')
+                    if idx < 2:
+                        self.logger.debug(f"Assigned division INC for total_points {points}")
+                    continue
+                if pd.isna(points) or exam_id not in division_lookup:
+                    results.append('ABS')
+                    if idx < 2:
+                        self.logger.debug(f"Assigned division ABS for total_points {points}")
                     continue
                 try:
                     lookup = division_lookup[exam_id]
                     for low, div in lookup:
                         if points >= low:
                             results.append(div)
+                            if idx < 2:
+                                self.logger.debug(f"Assigned division {div} for total_points {points}")
                             break
                     else:
-                        results.append(lookup[-1][1])
+                        results.append('ABS')
+                        if idx < 2:
+                            self.logger.debug(f"Assigned division ABS for total_points {points} (below lowest threshold)")
                 except Exception as e:
                     self.logger.error(f"Error mapping division at index {idx}, points {points}, exam_id {exam_id}: {str(e)}", exc_info=True)
-                    results.append(np.nan)
+                    results.append('ABS')
             self.logger.debug(f"Completed mapping divisions, results length: {len(results)}")
             return results
 
         df['division'] = map_divisions_vectorized(df['total_points'], df['exam_id'])
         self.logger.debug(f"Divisions assigned, non-null count: {df['division'].count()}")
+        sample_divisions = df[['student_global_id', 'total_points', 'division']].head(2)
+        self.logger.debug(f"Sample divisions: {sample_divisions.to_dict(orient='records')}")
 
         # Calculate avg_marks and total_marks
         self.logger.debug("Calculating average and total marks")
@@ -276,14 +364,14 @@ class DivisionProcessor:
         style = df['avg_style'].str.upper().fillna('')
         self.logger.debug(f"Unique avg_style values: {style.unique()}")
 
-        for avg_style, n_subjects in [('SEVEN_BEST', 7), ('EIGHT_BEST', 8)]:
+        for avg_style, n_subjects_avg in [('SEVEN_BEST', 7), ('EIGHT_BEST', 8)]:
             mask = style == avg_style
             self.logger.debug(f"Processing avg_style {avg_style}, rows: {mask.sum()}")
-            top = sorted_marks[mask, :n_subjects]
-            valid_top = valid[mask, :n_subjects]
+            top = sorted_marks[mask, :n_subjects_avg]
+            valid_top = valid[mask, :n_subjects_avg]
             totals = np.sum(np.where(valid_top, top, 0), axis=1)
             df.loc[mask, 'total_marks'] = totals
-            df.loc[mask, 'avg_marks'] = totals / n_subjects
+            df.loc[mask, 'avg_marks'] = totals / n_subjects_avg
 
         mask = style == 'AUTO'
         self.logger.debug(f"Processing avg_style AUTO, rows: {mask.sum()}")
@@ -292,8 +380,10 @@ class DivisionProcessor:
         totals = np.sum(np.where(valid_top, top, 0), axis=1)
         counts = valid_top.sum(axis=1)
         df.loc[mask, 'total_marks'] = totals
-        df.loc[mask, 'avg_marks'] = totals / np.maximum(7, counts)
+        df.loc[mask, 'avg_marks'] = totals / np.maximum(min_subjects, counts)
         self.logger.debug(f"Average marks calculated, non-null count: {df['avg_marks'].count()}")
+        sample_avg = df[['student_global_id', 'total_marks', 'avg_marks']].head(2)
+        self.logger.debug(f"Sample avg_marks: {sample_avg.to_dict(orient='records')}")
 
         # Calculate avg_grade
         self.logger.debug("Creating average grade lookup")
@@ -315,7 +405,9 @@ class DivisionProcessor:
             self.logger.debug(f"Mapping average grades, marks count: {avg_marks.count()}")
             grades = []
             for idx, (mark, exam_id) in enumerate(zip(avg_marks, exam_ids)):
-                if pd.isna(mark) or exam_id not in avg_grade_lookup:
+                if pd.isna(mark) or exam_id not in avg_grade_lookup or mark < 0 or mark > 100:
+                    if not pd.isna(mark) and (mark < 0 or mark > 100):
+                        self.logger.warning(f"Outlier avg_mark {mark} for student at index {idx}, assigned null grade")
                     grades.append(np.nan)
                     continue
                 try:
@@ -323,9 +415,13 @@ class DivisionProcessor:
                     for lower, grade in lookup:
                         if mark >= lower:
                             grades.append(grade)
+                            if idx < 2:
+                                self.logger.debug(f"Assigned grade {grade} for avg_mark {mark}")
                             break
                     else:
-                        grades.append(lookup[-1][1])
+                        grades.append(np.nan)
+                        if idx < 2:
+                            self.logger.debug(f"Assigned null grade for avg_mark {mark} (below lowest threshold)")
                 except Exception as e:
                     self.logger.error(f"Error mapping grade at index {idx}, mark {mark}, exam_id {exam_id}: {str(e)}", exc_info=True)
                     grades.append(np.nan)
@@ -334,10 +430,15 @@ class DivisionProcessor:
 
         df['avg_grade'] = map_avg_grade_vectorized(df['avg_marks'], df['exam_id'])
         self.logger.debug(f"Average grades assigned, non-null count: {df['avg_grade'].count()}")
+        sample_grades = df[['student_global_id', 'avg_marks', 'avg_grade']].head(2)
+        self.logger.debug(f"Sample avg_grade: {sample_grades.to_dict(orient='records')}")
+
+        # Handle absent and invalid cases
+        df = self.handle_absent_cases(df, is_old_curriculum, min_subjects)
 
         # Calculate rankings
         self.logger.debug("Calculating rankings")
-        df_valid = df[df['avg_marks'] >= 0].copy()
+        df_valid = df[(df['avg_marks'] >= 0) & (~df['avg_marks'].isna())].copy()
         self.logger.debug(f"Valid rows for ranking: {df_valid.shape[0]}")
         rank_cols = [
             'pos', 'out_of', 'ward_pos', 'ward_out_of', 'ward_pos_gvt', 'ward_pos_pvt',
@@ -386,7 +487,7 @@ class DivisionProcessor:
         self.logger.debug("Renaming best subject columns")
         df.rename(columns={
             f'best_{i}': name for i, name in enumerate(
-                ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'], 1
+                ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'][:n_subjects], 1
             )
         }, inplace=True)
 
@@ -394,6 +495,15 @@ class DivisionProcessor:
         self.logger.debug("Adding ID column")
         df.insert(0, 'id', [str(uuid.uuid4()) for _ in range(len(df))])
         self.logger.debug(f"Processed DataFrame final shape: {df.shape}, columns: {list(df.columns)}")
+
+        # Save records for centre_number=S0867 as CSV
+        self.logger.debug("Saving records for centre_number=S0867 to CSV")
+        s0867_df = df[df['centre_number'] == 'S0867']
+        if not s0867_df.empty:
+            s0867_df.to_csv('results_S0867.csv', index=False)
+            self.logger.debug(f"Saved {s0867_df.shape[0]} records for centre_number=S0867 to results_S0867.csv")
+        else:
+            self.logger.warning("No records found for centre_number=S0867")
 
         return df
 
