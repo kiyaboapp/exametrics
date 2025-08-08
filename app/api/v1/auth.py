@@ -12,7 +12,7 @@ from datetime import timedelta
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.get("/")
-async def all_endpoints(c):
+async def all_endpoints():
     return {"message": "All endpoints for authentication",
             "/login": {
                 "method": "POST",
@@ -42,3 +42,4 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return {"access_token": access_token, "token_type": "bearer"}
+

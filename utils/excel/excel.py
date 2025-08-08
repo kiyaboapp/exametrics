@@ -77,7 +77,7 @@ async def get_excel_workbook_name(
         return f"ENTRY_{separator.join(result)}_{timestamp}".upper()
     return f"ENTRY_SHEET_JOINT_EXAM_{timestamp}".upper()
 
-async def export_to_excel(
+async def export_to_excel_Old(
     exam_id: str,
     ward_name: str = "",
     council_name: str = "",
@@ -310,6 +310,332 @@ async def export_to_excel(
             for i, row in enumerate(data_array, start=2):
                 for j, value in enumerate(row, start=1):
                     students_sheet.cell(row=i, column=j).value = value
+            table1 = students_sheet.tables.get("Table1")
+            if table1:
+                table1.ref = f"A1:N{len(data_array) + 1}"  # Updated to include column N
+        else:
+            students_sheet["A2:N2"] = [""] * 14  # Updated to include column N
+            table1 = students_sheet.tables.get("Table1")
+            if table1:
+                table1.ref = "A1:N2"
+        
+        # Write subjects data
+        row_index = 2
+        for subj_data in subject_dict.values():
+            subjects_sheet[f"A{row_index}"] = subj_data[0]
+            subjects_sheet[f"B{row_index}"] = subj_data[2]
+            subjects_sheet[f"C{row_index}"] = subj_data[1]
+            subjects_sheet[f"D{row_index}"] = f"=COUNTIFS(Students!E:E,A{row_index})"
+            subjects_sheet[f"E{row_index}"] = f"=COUNTIFS(Students!E:E,A{row_index},Students!D:D,\">=0\")"
+            subjects_sheet[f"F{row_index}"] = f"=D{row_index}-E{row_index}"
+            subjects_sheet[f"G{row_index}"] = f"=IF(D{row_index}=0,\"N/A\",E{row_index}/D{row_index})"
+            row_index += 1
+        
+        if row_index > 2:
+            subjects_sheet[f"C{row_index}"] = "Total"
+            subjects_sheet[f"D{row_index}"] = f"=SUM(D2:D{row_index-1})"
+            subjects_sheet[f"E{row_index}"] = f"=SUM(E2:E{row_index-1})"
+            subjects_sheet[f"F{row_index}"] = f"=SUM(F2:F{row_index-1})"
+            subjects_sheet[f"G{row_index}"] = f"=IF(D{row_index}=0,\"N/A\",E{row_index}/D{row_index})"
+        
+        subjects_sheet.column_dimensions["G"].number_format = "0.0%"
+        
+        # Write schools data
+        row_index = 2
+        for school_data in school_dict.values():
+            schools_sheet[f"A{row_index}"] = school_data[0]
+            schools_sheet[f"B{row_index}"] = school_data[1]
+            schools_sheet[f"C{row_index}"] = school_data[2]  # ward_name
+            schools_sheet[f"D{row_index}"] = school_data[3]  # council_name
+            schools_sheet[f"E{row_index}"] = school_data[4]  # region_name
+            schools_sheet[f"F{row_index}"] = f"=COUNTIFS(Students!H:H,A{row_index})"
+            schools_sheet[f"G{row_index}"] = f"=COUNTIFS(Students!H:H,A{row_index},Students!D:D,\">=0\")"
+            schools_sheet[f"H{row_index}"] = f"=F{row_index}-G{row_index}"
+            schools_sheet[f"I{row_index}"] = f"=IF(F{row_index}=0,\"N/A\",G{row_index}/F{row_index})"
+            row_index += 1
+        
+        if row_index > 2:
+            schools_sheet[f"E{row_index}"] = "Total"
+            schools_sheet[f"F{row_index}"] = f"=SUM(F2:F{row_index-1})"
+            schools_sheet[f"G{row_index}"] = f"=SUM(G2:G{row_index-1})"
+            schools_sheet[f"H{row_index}"] = f"=SUM(H2:H{row_index-1})"
+            schools_sheet[f"I{row_index}"] = f"=IF(F{row_index}=0,\"N/A\",G{row_index}/F{row_index})"
+        
+        schools_sheet.column_dimensions["I"].number_format = "0.0%"
+        
+        # Create dropdowns in Interface sheet
+        centre_numbers = [str(school_data[0]) for school_data in school_dict.values() if school_data[0]]
+        if centre_numbers:
+            dv_centre = DataValidation(type="list", formula1=f'"{",".join(centre_numbers)}"', allow_blank=True)
+            dv_centre.add("C5")
+            interface_sheet.add_data_validation(dv_centre)
+            logger.debug(f"Added dropdown to Interface!C5 with {len(centre_numbers)} centre numbers")
+        
+        subject_codes = [str(subj_data[0]) for subj_data in subject_dict.values() if subj_data[0]]
+        if subject_codes:
+            interface_sheet["C6"].number_format = "@"
+            dv_subject = DataValidation(type="list", formula1=f'"{",".join(subject_codes)}"', allow_blank=True)
+            dv_subject.add("C6")
+            interface_sheet.add_data_validation(dv_subject)
+            logger.debug(f"Added dropdown to Interface!C6 with {len(subject_codes)} subject codes")
+        
+        # Save and close
+        workbook.save(save_path)
+        workbook.close()
+        
+        logger.info(f"Export completed successfully to {save_path}")
+        return save_path
+    
+    except aiomysql.Error as e:
+        logger.error(f"Error 1004: Database error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error 1003: Excel operation failed: {e}")
+        raise
+    finally:
+        if cursor:
+            await cursor.close()
+        if conn and pool:
+            pool.release(conn)
+        if pool:
+            pool.close()
+            await pool.wait_closed()
+
+
+async def export_to_excel(
+    exam_id: str,
+    ward_name: str = "",
+    council_name: str = "",
+    region_name: str = "",
+    school_type: str = "",
+    practical_mode: int = 0,
+    marks_filler: str = ""
+) -> str:
+    """Export student data to an Excel file and return the file path."""
+    pool = None
+    conn = None
+    cursor = None
+    
+    try:
+        pool = await aiomysql.create_pool(**DB_CONFIG)
+        conn = await pool.acquire()
+        cursor = await conn.cursor(aiomysql.DictCursor)
+        
+        # Debug: Check data existence
+        await cursor.execute(
+            "SELECT COUNT(*) AS count FROM exam_subjects WHERE exam_id = %s",
+            (exam_id,)
+        )
+        exam_subjects_count = (await cursor.fetchone())['count']
+        logger.info(f"Found {exam_subjects_count} subjects for exam_id={exam_id}")
+        
+        await cursor.execute(
+            "SELECT COUNT(*) AS count FROM student_subjects WHERE exam_id = %s",
+            (exam_id,)
+        )
+        student_subjects_count = (await cursor.fetchone())['count']
+        logger.info(f"Found {student_subjects_count} student-subject mappings for exam_id={exam_id}")
+        
+        # Build WHERE clause with parameterized query
+        where_clause = "WHERE es.exam_id = %s"
+        params = [exam_id]
+        location_filter = []
+        if ward_name:
+            location_filter.append("s.ward_name = %s")
+            params.append(ward_name)
+        if council_name:
+            location_filter.append("s.council_name = %s")
+            params.append(council_name)
+        if region_name:
+            location_filter.append("s.region_name = %s")
+            params.append(region_name)
+        if school_type:
+            location_filter.append("s.school_type = %s")
+            params.append(school_type)
+        
+        if location_filter:
+            where_clause += " AND " + " AND ".join(location_filter)
+        
+        if practical_mode == 2:  # ExportOnlyPracticalVersions
+            where_clause += " AND es.has_practical = TRUE"
+        
+        # SQL query with INNER JOINs
+        sql = f"""
+        SELECT st.student_id, st.student_global_id, st.full_name, st.sex,
+               es.subject_code, es.subject_name, es.subject_short,
+               s.centre_number, s.school_name,
+               s.ward_name, s.council_name, s.region_name,
+               s.school_type, es.has_practical
+        FROM schools s
+        INNER JOIN students st ON s.centre_number = st.centre_number
+        INNER JOIN student_subjects ss ON st.student_global_id = ss.student_global_id AND st.exam_id = ss.exam_id
+        INNER JOIN exam_subjects es ON ss.exam_id = es.exam_id AND ss.subject_code = es.subject_code
+        {where_clause}
+        ORDER BY st.student_id ASC, es.subject_code ASC
+        """
+        
+        await cursor.execute(sql, params)
+        records = await cursor.fetchall()
+        
+        # Error message for empty result
+        msg = "NO STUDENT REGISTERED FOR THIS CONDITION!"
+        if ward_name:
+            msg += f" WARD_NAME={ward_name}"
+        if council_name:
+            msg += f" COUNCIL={council_name}"
+        if region_name:
+            msg += f" REGION={region_name}"
+        if school_type:
+            msg += f" SCHOOL TYPE={school_type}"
+        if practical_mode != 0:
+            msg += f" PRACTICAL MODE={practical_mode}"
+        if exam_id:
+            msg += f" EXAM_ID={exam_id}"
+        
+        if not records:
+            logger.error(f"Error 1002: {msg}")
+            raise ValueError(msg)
+        
+        # Initialize dictionaries for subjects and schools
+        subject_dict = {}
+        school_dict = {}
+        data_array = []
+        
+        # Process records
+        prev = None
+        for record in records:
+            prev != record['centre_number'] and logger.info(f"centre_number changed: {record['centre_number']}") or True
+            prev = record['centre_number']
+            
+            school_key = (
+                f"{record['centre_number'] or ''}|{record['school_name'] or ''}|"
+                f"{record['ward_name'] or ''}|{record['council_name'] or ''}|"
+                f"{record['region_name'] or ''}|{record['school_type'] or ''}"
+            )
+            
+            if practical_mode != 2:  # Not ExportOnlyPracticalVersions
+                # Add theory row
+                data_array.append([
+                    record['student_id'] or '',
+                    record['full_name'] or '',
+                    record['sex'] or '',
+                    '',
+                    str(record['subject_code'] or ''),
+                    record['subject_name'] or '',
+                    record['subject_short'] or '',
+                    record['centre_number'] or '',
+                    record['school_name'] or '',
+                    record['ward_name'] or '',
+                    record['council_name'] or '',
+                    record['region_name'] or '',
+                    exam_id,
+                    record['student_global_id'] or ''
+                ])
+                
+                subj_key = (
+                    f"{record['subject_code'] or ''}|{record['subject_name'] or ''}|"
+                    f"{record['subject_short'] or ''}"
+                )
+                if subj_key not in subject_dict:
+                    subject_dict[subj_key] = [
+                        str(record['subject_code'] or ''),
+                        record['subject_name'] or '',
+                        record['subject_short'] or '',
+                        0, 0
+                    ]
+                subject_dict[subj_key][3] += 1
+                
+                if school_key not in school_dict:
+                    school_dict[school_key] = [
+                        record['centre_number'] or '',
+                        record['school_name'] or '',
+                        record['ward_name'] or '',
+                        record['council_name'] or '',
+                        record['region_name'] or '',
+                        0, 0
+                    ]
+                school_dict[school_key][5] += 1
+            
+            if record['has_practical'] and practical_mode != 1:  # Not ExportWithoutPractical
+                # Add practical row
+                data_array.append([
+                    record['student_id'] or '',
+                    record['full_name'] or '',
+                    record['sex'] or '',
+                    '',
+                    f"{record['subject_code'] or ''}-P",
+                    f"{record['subject_name'] or ''}-Practical",
+                    f"{record['subject_short'] or ''}-P",
+                    record['centre_number'] or '',
+                    record['school_name'] or '',
+                    record['ward_name'] or '',
+                    record['council_name'] or '',
+                    record['region_name'] or '',
+                    exam_id,
+                    record['student_global_id'] or ''
+                ])
+                
+                prac_subj_key = (
+                    f"{record['subject_code'] or ''}-P|"
+                    f"{record['subject_name'] or ''}-Practical|"
+                    f"{record['subject_short'] or ''}-P"
+                )
+                if prac_subj_key not in subject_dict:
+                    subject_dict[prac_subj_key] = [
+                        f"{record['subject_code'] or ''}-P",
+                        f"{record['subject_name'] or ''}-Practical",
+                        f"{record['subject_short'] or ''}-P",
+                        0, 0
+                    ]
+                subject_dict[prac_subj_key][3] += 1
+                
+                if school_key not in school_dict:
+                    school_dict[school_key] = [
+                        record['centre_number'] or '',
+                        record['school_name'] or '',
+                        record['ward_name'] or '',
+                        record['council_name'] or '',
+                        record['region_name'] or '',
+                        0, 0
+                    ]
+                school_dict[school_key][5] += 1
+        
+        # Copy master.xlsm to output
+        original_file = os.path.join(os.path.dirname(__file__), "master.xlsm")
+        if not os.path.exists(original_file):
+            logger.error("Error 1001: master.xlsm not found!")
+            raise FileNotFoundError("master.xlsm not found!")
+        
+        os.makedirs("./output", exist_ok=True)
+        save_path = os.path.join(
+            "./output",
+            f"{await get_excel_workbook_name(ward_name, council_name, region_name, school_type, practical_mode)}.xlsm"
+        )
+        
+        shutil.copyfile(original_file, save_path)
+        
+        # Open Excel workbook
+        workbook = openpyxl.load_workbook(save_path, keep_vba=True)
+        students_sheet = workbook["Students"]
+        subjects_sheet = workbook["Subjects"]
+        schools_sheet = workbook["Schools"]
+        interface_sheet = workbook["Interface"]
+        
+        # Clear Interface!A500 or set marks_filler
+        interface_sheet["A500"] = marks_filler if marks_filler else ""
+        
+        # Set number formats
+        students_sheet.column_dimensions["E"].number_format = "@"
+        subjects_sheet.column_dimensions["A"].number_format = "@"
+        
+        # Write student data using chunks to avoid memory issues
+        chunk_size = 1000
+        if data_array:
+            for chunk_start in range(0, len(data_array), chunk_size):
+                chunk = data_array[chunk_start:chunk_start + chunk_size]
+                for i, row in enumerate(chunk, start=2 + chunk_start):
+                    for j, value in enumerate(row, start=1):
+                        students_sheet.cell(row=i, column=j).value = value
             table1 = students_sheet.tables.get("Table1")
             if table1:
                 table1.ref = f"A1:N{len(data_array) + 1}"  # Updated to include column N
@@ -1514,8 +1840,8 @@ async def main():
         # )
         # print(f"Generated Excel file: {file_path}")
         
-        # uploaded = await import_marks_from_excel(excel_path)
-        # updates = await calculate_marks_and_ranks(exam_id)
+        uploaded = await import_marks_from_excel_old(excel_path)
+        updates = await calculate_marks_and_ranks(exam_id)
         # print(f"Updated {updates} records for exam_id={exam_id}")
         # # await process_exam_results(exam_id)
     except Exception as e:

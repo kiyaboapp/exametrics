@@ -35,6 +35,8 @@ class StudentSubject(Base):
     region_subject_out_of_gvt=Column(Integer)
     region_subject_pos_pvt = Column(Integer)  # Region-level position for private schools
     region_subject_out_of_pvt=Column(Integer)
+    school_pos=Column(Integer)
+    school_out_of=Column(Integer)  # Total students for this subject at school
 
     
     # RELATIONSHIPS

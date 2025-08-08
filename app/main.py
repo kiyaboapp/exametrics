@@ -51,6 +51,6 @@ app.include_router(user_exam_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(isal_router,prefix="/api/v1")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000,reload=True)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000,reload=True)
