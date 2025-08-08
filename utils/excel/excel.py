@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime
 import time
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 import aiomysql
 from dotenv import load_dotenv
 import numpy as np
@@ -44,7 +44,10 @@ async def get_excel_workbook_name(
     council_name: str = "",
     region_name: str = "",
     school_type: str = "",
-    practical_mode: int = 0
+    practical_mode: int = 0,
+    centre_number:str="",
+    school_name:str="",
+    school_count:int=0
 ) -> str:
     """Generate a unique Excel workbook filename based on parameters and timestamp."""
     separator = "_"
@@ -59,6 +62,14 @@ async def get_excel_workbook_name(
         result.append(region_name.replace(" ", "_"))
     if school_type:
         result.append(school_type.replace(" ", "_"))
+    if centre_number:
+        result.append(centre_number.replace(" ", "_"))
+    if school_name:
+        if school_count==0:
+            result.append(school_name.replace(" ", "_").upper().replace("Secondary_School","SS"))
+        else:
+            named=(f"CUSTOM {school_count} SCHOOLS").replace(" ", "_")
+            result.append(named)
     
     # Handle practical mode
     if practical_mode != 0:
@@ -409,7 +420,9 @@ async def export_to_excel(
     region_name: str = "",
     school_type: str = "",
     practical_mode: int = 0,
-    marks_filler: str = ""
+    marks_filler: str = "",
+    centre_number:str="",
+    centre_number_list:List[str] = [],
 ) -> str:
     """Export student data to an Excel file and return the file path."""
     pool = None
@@ -459,6 +472,24 @@ async def export_to_excel(
         if practical_mode == 2:  # ExportOnlyPracticalVersions
             where_clause += " AND es.has_practical = TRUE"
         
+        if centre_number:
+            # No need to use any location filter other than it as it has all
+            where_clause += " AND s.centre_number = %s"
+            params.append(centre_number)
+    
+        if centre_number:
+            # No need to use any location filter other than it as it has all
+            where_clause += " AND s.centre_number = %s"
+            params.append(centre_number)
+
+        school_count=0
+        if centre_number_list and not centre_number:  # use elif to avoid conflict with single centre_number
+            placeholders = ', '.join(['%s'] * len(centre_number_list))
+            where_clause += f" AND s.centre_number IN ({placeholders})"
+            params.extend(centre_number_list)
+            # Count Schools in the List
+            school_count= len(centre_number_list)
+
         # SQL query with INNER JOINs
         sql = f"""
         SELECT st.student_id, st.student_global_id, st.full_name, st.sex,
@@ -609,7 +640,16 @@ async def export_to_excel(
         os.makedirs("./output", exist_ok=True)
         save_path = os.path.join(
             "./output",
-            f"{await get_excel_workbook_name(ward_name, council_name, region_name, school_type, practical_mode)}.xlsm"
+            f"{await get_excel_workbook_name(
+                ward_name, 
+            council_name, 
+            region_name, 
+            school_type, 
+            practical_mode,
+            centre_number, 
+            record['school_name'],
+            school_count
+            )}.xlsm"
         )
         
         shutil.copyfile(original_file, save_path)
@@ -817,8 +857,8 @@ async def import_marks_from_excel_old(file_path: str) -> int:
                                 'exam_id': row['exam_id'],
                                 'student_global_id': row['student_global_id'],
                                 'subject_code': row['clean_subject_code'],
-                                'theory_marks': row['theory_marks'],
-                                'practical_marks': row['practical_marks']
+                                'theory_marks': None if pd.isna(row['theory_marks']) else row['theory_marks'],
+                                'practical_marks': None if pd.isna(row['practical_marks']) else row['practical_marks'],
                             }
                             for _, row in batch.iterrows()
                         ]
