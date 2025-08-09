@@ -21,7 +21,13 @@ from utils.processor.subjects_ranker import SubjectRanker
 async def main():
     settings = Settings()
     ranker = SubjectRanker(settings, '1f0656e3-8756-680b-ac24-8d5b3e217521')
-    await ranker.run()
+    response = await ranker.run()
+    print("Run Response:", response)
+    # Optionally verify rankings
+    df_verify, verify_duration = await ranker.verify_rankings()
+    print(f"Verification (5 records) took {verify_duration:.2f} seconds")
+    print("Verified Rankings:\n", df_verify.to_string())
 
 if __name__ == "__main__":
     asyncio.run(main())
+
